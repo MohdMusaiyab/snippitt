@@ -8,39 +8,45 @@ import { toast } from "sonner";
 interface ToggleSaveButtonProps {
   postId: string;
   initialIsSaved: boolean;
+  initialSaveCount: number;
 }
 
 const ToggleSaveButton: React.FC<ToggleSaveButtonProps> = ({
   postId,
   initialIsSaved,
+  initialSaveCount,
 }) => {
   const [isSaved, setIsSaved] = useState(initialIsSaved);
+  const [count, setCount] = useState(initialSaveCount);
   const [isPending, setIsPending] = useState(false);
 
   const handleToggle = async (e: React.MouseEvent) => {
-    e.stopPropagation(); // Stops the card from opening
+    e.stopPropagation();
     if (isPending) return;
 
-    // 1. Optimistic Update
-    const previousState = isSaved;
-    setIsSaved(!previousState);
+    const previous = isSaved;
+    const newState = !previous;
+
+    // 1️⃣ Optimistic Update
+    setIsSaved(newState);
+    setCount((prev) => (newState ? prev + 1 : prev - 1));
     setIsPending(true);
 
     try {
-      // 2. Choose the correct action
-      const result = previousState
+      const result = previous
         ? await unsavePost(postId)
         : await savePost(postId);
 
       if (!result.success) {
-        // 3. Rollback on failure
-        setIsSaved(previousState);
+        // 2️⃣ Rollback if server fails
+        setIsSaved(previous);
+        setCount(initialSaveCount);
         toast.error(result.error?.message || "Failed to update save status");
-      } else {
-        toast.success(previousState ? "Removed from saved" : "Post saved!");
       }
-    } catch (error) {
-      setIsSaved(previousState);
+    } catch {
+      // 3️⃣ Rollback on network error
+      setIsSaved(previous);
+      setCount(initialSaveCount);
       toast.error("Network error occurred");
     } finally {
       setIsPending(false);
@@ -48,21 +54,35 @@ const ToggleSaveButton: React.FC<ToggleSaveButtonProps> = ({
   };
 
   return (
-    <button
-      onClick={handleToggle}
-      disabled={isPending}
-      className="w-8 h-8 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center transition hover:bg-white hover:shadow-md active:scale-90 focus:outline-none"
-      aria-label={isSaved ? "Unsave" : "Save"}
+    <div
+      className="flex items-center"
+      onClick={(e) => e.stopPropagation()}
     >
-      <Bookmark
-        size={18}
-        className={`transition-all duration-200 ${
-          isSaved
-            ? "fill-[#5865F2] text-[#5865F2]"
-            : "text-gray-600 group-hover:text-[#5865F2]"
+      <button
+        onClick={handleToggle}
+        disabled={isPending}
+        className="w-8 h-8 cursor-pointer bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center transition hover:bg-white hover:shadow-md active:scale-90 focus:outline-none"
+        aria-label={isSaved ? "Unsave" : "Save"}
+      >
+        <Bookmark
+          size={18}
+          strokeWidth={2}
+          className={`transition-all duration-200 ${
+            isSaved
+              ? "fill-primary stroke-primary"
+              : "fill-transparent stroke-gray-500 hover:stroke-primary"
+          }`}
+        />
+      </button>
+
+      <span
+        className={`text-xs font-medium tabular-nums ${
+          isSaved ? "text-primary" : "text-gray-500"
         }`}
-      />
-    </button>
+      >
+        {count}
+      </span>
+    </div>
   );
 };
 

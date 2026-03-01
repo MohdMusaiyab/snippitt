@@ -16,33 +16,31 @@ const LikeButton: React.FC<LikeButtonProps> = ({
   initialIsLiked,
   initialLikeCount,
 }) => {
-  // Local state for instant UI feedback
   const [liked, setLiked] = useState(initialIsLiked);
   const [count, setCount] = useState(initialLikeCount);
   const [isPending, setIsPending] = useState(false);
 
   const handleLike = async (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent card navigation
+    e.stopPropagation();
     if (isPending) return;
 
-    // 1. Optimistic Update
-    const newLikedState = !liked;
-    setLiked(newLikedState);
-    setCount((prev) => (newLikedState ? prev + 1 : prev - 1));
+    const previous = liked;
+    const newState = !previous;
+
+    setLiked(newState);
+    setCount((prev) => (newState ? prev + 1 : prev - 1));
     setIsPending(true);
 
     try {
       const result = await toggleLike(postId);
 
       if (!result.success) {
-        // 2. Rollback if server fails
-        setLiked(initialIsLiked);
+        setLiked(previous);
         setCount(initialLikeCount);
         toast.error("Failed to update like");
       }
-    } catch (error) {
-      // 3. Rollback on network error
-      setLiked(initialIsLiked);
+    } catch {
+      setLiked(previous);
       setCount(initialLikeCount);
       toast.error("Something went wrong");
     } finally {
@@ -51,26 +49,35 @@ const LikeButton: React.FC<LikeButtonProps> = ({
   };
 
   return (
-    <button
-      onClick={handleLike}
-      disabled={isPending}
-      className="group flex items-center gap-1.5 focus:outline-none transition-transform active:scale-90"
-      aria-label={liked ? "Unlike" : "Like"}
+    <div
+      className="flex items-center"
+      onClick={(e) => e.stopPropagation()}
     >
-      <Heart
-        size={18}
-        className={`transition-colors duration-200 ${
-          liked
-            ? "fill-red-500 text-red-500"
-            : "text-zinc-400 group-hover:text-red-400"
-        }`}
-      />
+      <button
+        onClick={handleLike}
+        disabled={isPending}
+        className="w-8 h-8 cursor-pointer bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center transition hover:bg-white hover:shadow-md active:scale-90 focus:outline-none"
+        aria-label={liked ? "Unlike" : "Like"}
+      >
+        <Heart
+          size={18}
+          strokeWidth={2}
+          className={`transition-all duration-200 ${
+            liked
+              ? "fill-red-500 stroke-red-500"
+              : "fill-transparent stroke-gray-500 hover:stroke-red-500"
+          }`}
+        />
+      </button>
+
       <span
-        className={`text-sm font-medium ${liked ? "text-red-500" : "text-zinc-500"}`}
+        className={`text-xs font-medium tabular-nums ${
+          liked ? "text-red-500" : "text-gray-500"
+        }`}
       >
         {count}
       </span>
-    </button>
+    </div>
   );
 };
 

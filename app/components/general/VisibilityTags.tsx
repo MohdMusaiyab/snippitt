@@ -11,13 +11,13 @@ const visibilityStyles: Record<Visibility, string> = {
 };
 
 export const VisibilityTag = ({ visibility }: VisibilityTagProps) => {
-  const normalized = visibility.toLowerCase() as Visibility;
+  const key = visibility.toUpperCase() as Visibility;
 
   return (
     <span
-      className={`text-xs px-2 py-1 rounded-full font-medium ${visibilityStyles[normalized]}`}
+      className={`text-xs px-2 py-1 rounded-full font-medium ${visibilityStyles[key]}`}
     >
-      {normalized.charAt(0).toUpperCase() + normalized.slice(1)}
+      {key.charAt(0) + key.slice(1).toLowerCase()}
     </span>
   );
 };

@@ -16,6 +16,7 @@ interface SnippetProps {
   toggleMenu: (id: string) => void;
   showActions?: boolean;
   currentUserId?: string;
+  variant?: "default" | "compact";
 }
 
 const Snippet = ({
@@ -24,6 +25,7 @@ const Snippet = ({
   toggleMenu,
   showActions = true,
   currentUserId,
+  variant = "default",
 }: SnippetProps) => {
   function timeAgo(date: string | Date): string {
     const inputDate = new Date(date);
@@ -61,6 +63,105 @@ const Snippet = ({
 
   const isCurrentUsersPost = currentUserId === post.user.id;
 
+  if (variant === "compact") {
+    return (
+      <div
+        className="relative bg-white border border-gray-100 rounded-xl 
+hover:border-gray-200 hover:shadow-sm transition-all cursor-pointer 
+flex flex-col sm:flex-row gap-4 p-4 group"
+        onClick={handleCardClick}
+      >
+        {/* Top-right menu button */}
+        {showActions && (
+          <div
+            className="absolute top-3 right-3 z-20"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative">
+              <button
+                onClick={() => toggleMenu(post.id)}
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 transition"
+              >
+                <Ellipsis size={16} className="text-gray-500" />
+              </button>
+
+              {menuOpen === post.id && (
+                <div className="absolute right-0 mt-2 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1">
+                  <AddCollectionButton postId={post.id} userId={post.user.id} />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Thumbnail */}
+        <div className="relative w-full sm:w-36 h-48 sm:h-24 rounded-lg overflow-hidden flex-shrink-0">
+          <Image
+            src={post.coverImage || DEFAULT_COVER_IMAGE}
+            alt="Cover"
+            fill
+            className="object-cover"
+          />
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0 flex flex-col justify-between sm:pr-8">
+          {/* Title + Description */}
+          <div>
+            <h3 className="font-semibold text-gray-900 truncate group-hover:text-primary transition">
+              {post.title}
+            </h3>
+
+            <p className="text-sm text-gray-500 line-clamp-2 mt-1">
+              {post.description}
+            </p>
+          </div>
+
+          {/* Engagement Row */}
+          <div
+            className="flex items-center justify-between mt-3 text-xs text-gray-500"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Left side: meta */}
+            <span>{timeAgo(post.createdAt)}</span>
+
+            {/* Right side: stats */}
+            <div className="flex items-center gap-2">
+              {/* Like */}
+              <LikeButton
+                postId={post.id}
+                initialIsLiked={post.isLiked}
+                initialLikeCount={post._count.likes}
+              />
+
+              {/* Comments */}
+              <div className="flex items-center">
+                <div className="w-8 h-8 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center transition hover:bg-white hover:shadow-md">
+                  <MessageCircle
+                    size={18}
+                    strokeWidth={2}
+                    className="stroke-gray-500 hover:stroke-primary transition"
+                  />
+                </div>
+
+                <span className="text-xs tabular-nums text-gray-500">
+                  {post._count.comments}
+                </span>
+              </div>
+
+              {/* Saved */}
+              <ToggleSaveButton
+                postId={post.id}
+                initialIsSaved={post.isSaved}
+                initialSaveCount={post._count.savedBy}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md overflow-hidden transition-shadow cursor-pointer"
@@ -81,8 +182,6 @@ const Snippet = ({
         {/* Top-right Buttons */}
         {showActions && (
           <div className="absolute top-3 right-3 flex gap-2 z-10">
-            <ToggleSaveButton postId={post.id} initialIsSaved={post.isSaved} />
-
             <div className="relative">
               <button
                 onClick={(e) => {
@@ -195,39 +294,42 @@ const Snippet = ({
         {/* Footer - Visibility & Stats */}
         <div className="flex items-center justify-between">
           <VisibilityTag visibility={post.visibility as Visibility} />
-          {post.isDraft && (
-            <span className="px-2 py-1 text-[10px] font-black bg-amber-100 text-amber-700 rounded-md uppercase tracking-wider">
-              Draft
-            </span>
-          )}
 
           <div
-            className="flex items-center gap-4 text-sm text-zinc-400"
+            className="flex items-center gap-2 text-sm text-zinc-400"
             onClick={(e) => e.stopPropagation()}
           >
-            <span className="flex items-center gap-1">
-              <LikeButton
-                postId={post.id}
-                initialIsLiked={post.isLiked}
-                initialLikeCount={post._count.likes}
-              />
-            </span>
+            <LikeButton
+              postId={post.id}
+              initialIsLiked={post.isLiked}
+              initialLikeCount={post._count.likes}
+            />
 
-            <span className="flex items-center gap-1">
-              <MessageCircle size={18} />
-              {post._count.comments}
-            </span>
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center transition hover:bg-white hover:shadow-md">
+                <MessageCircle
+                  size={18}
+                  strokeWidth={2}
+                  className="stroke-gray-500 hover:stroke-primary transition"
+                />
+              </div>
 
-            <span className="flex items-center gap-1 text-xs">
-              <span className="text-gray-400">Saved:</span>
-              {post._count.savedBy}
-            </span>
+              <span className="text-xs tabular-nums text-gray-500">
+                {post._count.comments}
+              </span>
+            </div>
+
+            <ToggleSaveButton
+              postId={post.id}
+              initialIsSaved={post.isSaved}
+              initialSaveCount={post._count.savedBy}
+            />
           </div>
         </div>
 
-        {/* Tags (Optional - if you want to show them) */}
+        {/* Tags */}
         {post.tags && post.tags.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1">
+          <div className="mt-3 flex flex-wrap gap-2">
             {post.tags.slice(0, 3).map((tag) => (
               <span
                 key={tag}
@@ -236,6 +338,7 @@ const Snippet = ({
                 {tag}
               </span>
             ))}
+
             {post.tags.length > 3 && (
               <span className="px-2 py-1 text-xs text-gray-400">
                 +{post.tags.length - 3} more

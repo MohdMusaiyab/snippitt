@@ -19,6 +19,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import Button from "@/app/components/Button";
+import Snippet from "./Snippitt";
 
 const DashboardClient = ({ data, currentUserId, currentUserName }: any) => {
   const { stats, recentPosts, drafts, collections } = data;
@@ -26,27 +27,40 @@ const DashboardClient = ({ data, currentUserId, currentUserName }: any) => {
   const toggleMenu = (id: string) => setMenuOpen(menuOpen === id ? null : id);
   const firstName = currentUserName?.split(" ")[0] || "there";
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    if (hour < 21) return "Good evening";
+    return "Good night";
+  };
+
+  const greeting = getGreeting();
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-10 space-y-10">
       {/* ── HEADER BAR ── */}
-      <header className="flex items-center justify-between">
+      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-indigo-500 mb-1">
             Welcome back!
           </p>
-          <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">
-            Good morning, {firstName} 👋
+
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900 break-words">
+            {greeting}, {firstName} 👋
           </h1>
+
           <p className="text-sm text-gray-500 mt-1">
             Here's everything happening with your content.
           </p>
         </div>
 
-        <Link href="/create-post">
+        <Link href="/create-post" className="w-full sm:w-auto">
           <Button
             variant="primary"
             size="md"
-            className="flex items-center gap-1"
+            className="flex items-center justify-center gap-1 w-full sm:w-auto"
           >
             <Plus size={16} />
             New Post
@@ -173,10 +187,6 @@ const DashboardClient = ({ data, currentUserId, currentUserName }: any) => {
 
 export default DashboardClient;
 
-/* ─────────────────────────────────────────── */
-/*  Sub-components                             */
-/* ─────────────────────────────────────────── */
-
 const colorMap: Record<string, { bg: string; icon: string; badge: string }> = {
   indigo: {
     bg: "bg-indigo-50",
@@ -247,67 +257,16 @@ function SectionHeader({ title, icon, href, count }: any) {
   );
 }
 
-function PostRow({ post, currentUserId, menuOpen, toggleMenu }: any) {
+function PostRow({ post, menuOpen, toggleMenu, currentUserId }: any) {
   return (
-    <div className="group bg-white rounded-2xl border border-gray-100 p-5 hover:border-indigo-200 hover:shadow-md transition-all duration-200 flex items-start gap-4">
-      {/* Thumbnail */}
-      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-100 to-blue-50 flex-shrink-0 overflow-hidden">
-        {post.coverImage && post.coverImage !== "/default-cover.png" ? (
-          <img
-            src={post.coverImage}
-            alt={post.title}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-indigo-300">
-            <BookOpen size={22} />
-          </div>
-        )}
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        <Link href={`/posts/${post.id}`}>
-          <h3 className="font-semibold text-gray-900 text-sm truncate group-hover:text-indigo-600 transition-colors">
-            {post.title || "Untitled"}
-          </h3>
-        </Link>
-        {post.excerpt && (
-          <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">
-            {post.excerpt}
-          </p>
-        )}
-        <div className="flex items-center gap-3 mt-2">
-          <span className="text-[11px] text-gray-400">
-            {post.isDraft
-              ? "Draft"
-              : new Date(post.createdAt).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })}
-          </span>
-
-          {post.viewCount != null && (
-            <span className="flex items-center gap-1 text-[11px] text-gray-400">
-              <Eye size={11} /> {post.viewCount}
-            </span>
-          )}
-          {post.likesCount != null && (
-            <span className="flex items-center gap-1 text-[11px] text-gray-400">
-              <Heart size={11} /> {post.likesCount}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Actions */}
-      <button
-        onClick={() => toggleMenu(post.id)}
-        className="opacity-0 group-hover:opacity-100 transition p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"
-      >
-        <MoreHorizontal size={16} />
-      </button>
-    </div>
+    <Snippet
+      post={post}
+      menuOpen={menuOpen}
+      toggleMenu={toggleMenu}
+      currentUserId={currentUserId}
+      showActions={true}
+      variant="compact"
+    />
   );
 }
 

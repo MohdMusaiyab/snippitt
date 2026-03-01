@@ -36,7 +36,7 @@ async function signPostImages(posts: any[]) {
       );
 
       const coverImageData =
-        post.images.find((img: any) => img.isCover === true) || post.images[0]; 
+        post.images.find((img: any) => img.isCover === true) || post.images[0];
 
       const signedCoverUrl = await getValidImageUrl(coverImageData?.url);
 
@@ -87,6 +87,11 @@ export async function getDashboardData() {
           user: { select: { id: true, username: true, avatar: true } },
           images: true,
           _count: { select: { likes: true, comments: true, savedBy: true } },
+          likes: { where: {userId}, select: { id: true } }, 
+          savedBy: {
+            where: { userId },
+            select: { id: true },
+          },
         },
       }),
 
@@ -136,6 +141,12 @@ export async function getDashboardData() {
         getValidImageUrl(userData?.avatar),
       ]);
 
+    const formattedPosts = signedPosts.map((p: any) => ({
+      ...p,
+      isLiked: p.likes?.length > 0,
+      isSaved: p.savedBy?.length > 0,
+    }));
+
     return {
       success: true,
       data: {
@@ -147,7 +158,7 @@ export async function getDashboardData() {
           collectionsCount,
           avatar: signedDashboardAvatar,
         },
-        recentPosts: signedPosts,
+        recentPosts: formattedPosts,
         drafts: signedDrafts,
         collections,
       },
