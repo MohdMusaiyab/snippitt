@@ -11,6 +11,7 @@ interface ExploreOptions {
   perPage?: number;
   search?: string;
   category?: string;
+  tag?: string; 
 }
 
 export async function getExplorePosts(options: ExploreOptions = {}) {
@@ -37,7 +38,7 @@ export async function getExplorePosts(options: ExploreOptions = {}) {
     const visibilityFilter = {
       OR: [
         { visibility: "PUBLIC" as any },
-        ...(userId ? [{ userId: userId }] : []), 
+        ...(userId ? [{ userId: userId }] : []),
         {
           AND: [
             { visibility: "FOLLOWERS" as any },
@@ -48,15 +49,27 @@ export async function getExplorePosts(options: ExploreOptions = {}) {
     };
 
     const whereClause: any = {
-      isDraft: false, 
+      isDraft: false,
       ...visibilityFilter,
+
       ...(search && {
         OR: [
           { title: { contains: search, mode: "insensitive" } },
           { description: { contains: search, mode: "insensitive" } },
         ],
       }),
+
       ...(options.category && { category: options.category }),
+
+      ...(options.tag && {
+        tags: {
+          some: {
+            tag: {
+              name: options.tag,
+            },
+          },
+        },
+      }),
     };
 
     // 3. Execute Query with exact same "include" structure as getMyPosts
@@ -65,7 +78,7 @@ export async function getExplorePosts(options: ExploreOptions = {}) {
         where: whereClause,
         include: {
           user: { select: { id: true, username: true, avatar: true } },
-          images: { where: { isCover: true }, take: 1 }, 
+          images: { where: { isCover: true }, take: 1 },
           tags: { include: { tag: true } },
           _count: { select: { likes: true, comments: true, savedBy: true } },
           likes: userId ? { where: { userId }, select: { userId: true } } : false,
@@ -117,7 +130,7 @@ export async function getExplorePosts(options: ExploreOptions = {}) {
           images: post.images.map((img) => ({
             id: img.id,
             url: signedCoverImageUrl || img.url,
-            description: null, 
+            description: null,
             isCover: img.isCover,
             createdAt: post.createdAt,
             updatedAt: post.updatedAt,

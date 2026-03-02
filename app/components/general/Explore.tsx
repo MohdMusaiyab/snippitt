@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Loader2, ChevronDown } from "lucide-react";
 import Snippet from "@/app/components/general/Snippitt";
@@ -11,11 +17,14 @@ import Button from "@/app/components/Button";
 
 interface ExploreProps {
   initialPosts: Post[];
-  initialPagination: {
-    total: number;
-    pages: number;
-    currentPage: number;
-  } | undefined;
+  initialPagination:
+    | {
+        total: number;
+        pages: number;
+        currentPage: number;
+      }
+    | undefined;
+  initialTag?: string;
 }
 
 const PostSkeleton = () => (
@@ -36,48 +45,68 @@ const PostSkeleton = () => (
   </div>
 );
 
-const Explore = ({ initialPosts, initialPagination }: ExploreProps) => {
+const Explore = ({
+  initialPosts,
+  initialPagination,
+  initialTag,
+}: ExploreProps) => {
   // 1. Initialize state with Server Data
   const [posts, setPosts] = useState<Post[]>(initialPosts);
   const [loading, setLoading] = useState(false); // False because we have initial data
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(initialPagination?.currentPage || 1);
   const [hasMore, setHasMore] = useState(
-    initialPagination ? initialPagination.currentPage < initialPagination.pages : false
+    initialPagination
+      ? initialPagination.currentPage < initialPagination.pages
+      : false,
   );
-  
+
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [selectedTag, setSelectedTag] = useState(initialTag || "");
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   // Track if we've already done the first render to prevent duplicate fetching
   const isFirstRender = useRef(true);
 
-  const fetchPosts = useCallback(async (pageNum: number, search: string, category: string, isAppend: boolean = false) => {
-    try {
-      if (isAppend) setLoadingMore(true);
-      else setLoading(true);
+  const fetchPosts = useCallback(
+    async (
+      pageNum: number,
+      search: string,
+      category: string,
+      isAppend: boolean = false,
+    ) => {
+      try {
+        if (isAppend) setLoadingMore(true);
+        else setLoading(true);
 
-      const result = await getExplorePosts({
-        page: pageNum,
-        perPage: 9,
-        search: search,
-        category: category || undefined,
-      });
+        const result = await getExplorePosts({
+          page: pageNum,
+          perPage: 9,
+          search,
+          category: category || undefined,
+          tag: selectedTag || undefined, 
+        });
 
-      if (result.success && result.data) {
-        setPosts(prev => isAppend ? [...prev, ...result.data!.posts] : result.data!.posts);
-        setHasMore(result.data.pagination.currentPage < result.data.pagination.pages);
+        if (result.success && result.data) {
+          setPosts((prev) =>
+            isAppend ? [...prev, ...result.data!.posts] : result.data!.posts,
+          );
+          setHasMore(
+            result.data.pagination.currentPage < result.data.pagination.pages,
+          );
+        }
+      } catch (error) {
+        console.error("Fetch Error:", error);
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
       }
-    } catch (error) {
-      console.error("Fetch Error:", error);
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   // Handle Search Input with Debounce
   const handleSearchChange = (val: string) => {
@@ -95,7 +124,7 @@ const Explore = ({ initialPosts, initialPagination }: ExploreProps) => {
       return;
     }
     fetchPosts(1, searchTerm, selectedCategory, false);
-  }, [searchTerm, selectedCategory, fetchPosts]);
+  }, [searchTerm, selectedCategory, selectedTag, fetchPosts]);
 
   // 3. Load More Fetch
   useEffect(() => {
@@ -110,12 +139,14 @@ const Explore = ({ initialPosts, initialPagination }: ExploreProps) => {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
         {/* Header & Search Bar */}
         <div className="mb-10 text-center">
-          <h1 className="text-4xl font-extrabold text-gray-900 mb-4 tracking-tight">Explore Snippets</h1>
+          <h1 className="text-4xl font-extrabold text-gray-900 mb-4 tracking-tight">
+            Explore Snippets
+          </h1>
           <p className="text-gray-600 max-w-2xl mx-auto mb-8">
-            Discover code tutorials, film reflections, and projects from the community.
+            Discover code tutorials, film reflections, and projects from the
+            community.
           </p>
 
           <div className="flex flex-col md:flex-row items-center justify-center gap-4 max-w-4xl mx-auto">
@@ -130,20 +161,28 @@ const Explore = ({ initialPosts, initialPagination }: ExploreProps) => {
             </div>
 
             <div className="relative w-full md:w-auto">
-              <button 
+              <button
                 onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
                 className="w-full md:w-48 flex items-center justify-between px-4 py-3 bg-white border border-gray-200 rounded-2xl shadow-sm hover:border-[#5865F2] transition-all"
               >
                 <span className="text-sm font-medium text-gray-700">
-                  {selectedCategory ? selectedCategory.replace(/_/g, ' ') : "All Categories"}
+                  {selectedCategory
+                    ? selectedCategory.replace(/_/g, " ")
+                    : "All Categories"}
                 </span>
-                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showCategoryDropdown ? 'rotate-180' : ''}`} />
+                <ChevronDown
+                  className={`w-4 h-4 text-gray-400 transition-transform ${showCategoryDropdown ? "rotate-180" : ""}`}
+                />
               </button>
 
               {showCategoryDropdown && (
                 <div className="absolute top-full mt-2 w-full bg-white border border-gray-100 rounded-xl shadow-xl z-50 py-2 animate-in fade-in slide-in-from-top-2">
-                  <button 
-                    onClick={() => { setSelectedCategory(""); setShowCategoryDropdown(false); setPage(1); }}
+                  <button
+                    onClick={() => {
+                      setSelectedCategory("");
+                      setShowCategoryDropdown(false);
+                      setPage(1);
+                    }}
                     className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 text-gray-700"
                   >
                     All Categories
@@ -151,10 +190,14 @@ const Explore = ({ initialPosts, initialPagination }: ExploreProps) => {
                   {Object.values(Category).map((cat) => (
                     <button
                       key={cat}
-                      onClick={() => { setSelectedCategory(cat); setShowCategoryDropdown(false); setPage(1); }}
+                      onClick={() => {
+                        setSelectedCategory(cat);
+                        setShowCategoryDropdown(false);
+                        setPage(1);
+                      }}
                       className="w-full text-left px-4 py-2 text-sm hover:bg-[#5865F2]/5 hover:text-[#5865F2] transition-colors"
                     >
-                      {cat.replace(/_/g, ' ')}
+                      {cat.replace(/_/g, " ")}
                     </button>
                   ))}
                 </div>
@@ -166,7 +209,9 @@ const Explore = ({ initialPosts, initialPagination }: ExploreProps) => {
         {/* Content Area */}
         {loading && page === 1 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[...Array(6)].map((_, i) => <PostSkeleton key={i} />)}
+            {[...Array(6)].map((_, i) => (
+              <PostSkeleton key={i} />
+            ))}
           </div>
         ) : posts.length > 0 ? (
           <>
@@ -196,12 +241,16 @@ const Explore = ({ initialPosts, initialPagination }: ExploreProps) => {
             {hasMore && (
               <div className="mt-12 text-center">
                 <Button
-                  onClick={() => setPage(p => p + 1)}
+                  onClick={() => setPage((p) => p + 1)}
                   variant="primary"
                   size="lg"
                   disabled={loadingMore}
                   className="px-10"
-                  icon={loadingMore ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+                  icon={
+                    loadingMore ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : null
+                  }
                 >
                   {loadingMore ? "Loading..." : "Show More Posts"}
                 </Button>
@@ -213,9 +262,20 @@ const Explore = ({ initialPosts, initialPagination }: ExploreProps) => {
             <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
               <Search className="w-10 h-10 text-gray-300" />
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">No snippets found</h3>
-            <p className="text-gray-500 mb-8">Try adjusting your filters or search keywords.</p>
-            <Button variant="outline" onClick={() => { setSearchTerm(""); setSelectedCategory(""); setPage(1); }}>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">
+              No snippets found
+            </h3>
+            <p className="text-gray-500 mb-8">
+              Try adjusting your filters or search keywords.
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSearchTerm("");
+                setSelectedCategory("");
+                setPage(1);
+              }}
+            >
               Clear All Filters
             </Button>
           </div>

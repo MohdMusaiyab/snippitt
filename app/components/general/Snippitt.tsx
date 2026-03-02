@@ -331,12 +331,17 @@ flex flex-col sm:flex-row gap-4 p-4 group"
         {post.tags && post.tags.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
             {post.tags.slice(0, 3).map((tag) => (
-              <span
+              <Link
                 key={tag}
-                className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full"
+                href={{
+                  pathname: "/explore/posts",
+                  query: { tag },
+                }}
+                onClick={(e) => e.stopPropagation()}
+                className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition"
               >
                 {tag}
-              </span>
+              </Link>
             ))}
 
             {post.tags.length > 3 && (
