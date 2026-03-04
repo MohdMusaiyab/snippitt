@@ -57,7 +57,7 @@ const Snippet = ({
   }
 
   const handleCardClick = () => {
-    const link = post.linkTo || `/post/${post.id}`;
+    const link = post.linkTo || `/posts/${post.id}`;
     window.open(link, "_blank");
   };
 
@@ -108,9 +108,9 @@ flex flex-col sm:flex-row gap-4 p-4 group"
         <div className="flex-1 min-w-0 flex flex-col justify-between sm:pr-8">
           {/* Title + Description */}
           <div>
-            <h3 className="font-semibold text-gray-900 truncate group-hover:text-primary transition">
+            <Link href={`/posts/${post.id}`} className="font-semibold text-gray-900 truncate group-hover:text-primary transition">
               {post.title}
-            </h3>
+            </Link>
 
             <p className="text-sm text-gray-500 line-clamp-2 mt-1">
               {post.description}
@@ -294,6 +294,12 @@ flex flex-col sm:flex-row gap-4 p-4 group"
         {/* Footer - Visibility & Stats */}
         <div className="flex items-center justify-between">
           <VisibilityTag visibility={post.visibility as Visibility} />
+
+          {post.isDraft && (
+            <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full">
+              Draft
+            </span>
+          )}
 
           <div
             className="flex items-center gap-2 text-sm text-zinc-400"

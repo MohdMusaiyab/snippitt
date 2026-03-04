@@ -12,6 +12,7 @@ interface GetMyPostsOptions {
   page?: number;
   perPage?: number;
   category?: string;
+  visibility?: "PUBLIC" | "PRIVATE" | "FOLLOWERS" | "DRAFT";
 }
 
 export async function getMyPosts(options: GetMyPostsOptions = {}): Promise<{
@@ -55,6 +56,15 @@ export async function getMyPosts(options: GetMyPostsOptions = {}): Promise<{
 
     if (options.category) {
       whereClause.category = options.category;
+    }
+
+    if (options.visibility) {
+      if (options.visibility === "DRAFT") {
+        whereClause.isDraft = true;
+      } else {
+        whereClause.visibility = options.visibility;
+        whereClause.isDraft = false;
+      }
     }
 
     // 2. Fetch data in parallel

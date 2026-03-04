@@ -214,19 +214,21 @@ function StatCard({ label, value, icon, color }: any) {
   const c = colorMap[color];
   return (
     <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between">
-        <div className={`p-2.5 rounded-xl ${c.bg} ${c.icon}`}>{icon}</div>
+      <div className="flex items-center justify-between">
         {/* LATER */}
         {/* {trend && (
           <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${c.badge}`}>
-            {trend}
+          {trend}
           </span>
-        )} */}
+          )} */}
+        <div>
+          <p className="text-3xl font-black text-gray-900 tabular-nums">
+            {value}
+          </p>
+          <p className="text-xs text-gray-500 font-medium mt-0.5">{label}</p>
+        </div>
+        <div className={`p-2.5 rounded-xl ${c.bg} ${c.icon}`}>{icon}</div>
       </div>
-      <p className="mt-4 text-3xl font-black text-gray-900 tabular-nums">
-        {value}
-      </p>
-      <p className="text-xs text-gray-500 font-medium mt-0.5">{label}</p>
     </div>
   );
 }
