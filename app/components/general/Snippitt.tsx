@@ -164,7 +164,8 @@ flex flex-col sm:flex-row gap-4 p-4 group"
 
   return (
     <div
-      className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md overflow-hidden transition-shadow cursor-pointer"
+      key={post.id}
+      className="group bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md overflow-hidden transition-shadow cursor-pointer"
       onClick={handleCardClick}
     >
       {/* Cover Image */}
@@ -181,14 +182,14 @@ flex flex-col sm:flex-row gap-4 p-4 group"
 
         {/* Top-right Buttons */}
         {showActions && (
-          <div className="absolute top-3 right-3 flex gap-2 z-10">
+          <div className="absolute top-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition">
             <div className="relative">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   toggleMenu(post.id);
                 }}
-                className="w-8 h-8 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center transition hover:bg-white hover:shadow-md active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                className="w-8 h-8 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white hover:shadow-md"
                 aria-label="More options"
                 aria-haspopup="true"
                 aria-expanded={menuOpen === post.id}
@@ -198,7 +199,7 @@ flex flex-col sm:flex-row gap-4 p-4 group"
 
               {menuOpen === post.id && (
                 <div
-                  className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-30 py-1 animate-fade-in"
+                  className="absolute right-0 mt-2 w-44 bg-white rounded-lg shadow-lg border border-gray-200 z-30 py-1"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <AddCollectionButton postId={post.id} userId={post.user.id} />
