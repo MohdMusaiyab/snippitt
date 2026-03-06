@@ -97,91 +97,98 @@ const ExploreUsersClient = ({ initialUsers }: ExploreUsersClientProps) => {
   }, [inView, hasMore, isLoading, loadMoreUsers]);
 
   return (
-    <div className="space-y-12">
+    <div className="max-w-7xl mx-auto px-6 py-10 space-y-10">
+      {/* Page Header */}
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900">
+          Explore Creators
+        </h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Discover developers and creators across the platform.
+        </p>
+      </div>
+
       {/* Search Bar Container */}
-      <div className="relative max-w-md mx-auto">
-        <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none text-gray-400">
-          <Search size={18} />
+      <div className="mb-8">
+        <div className="relative max-w-md">
+          <Search
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+          />
+
+          <input
+            type="text"
+            placeholder="Search by username..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-9 py-2.5 text-sm
+                 bg-gray-50 border border-gray-200
+                 rounded-xl
+                 focus:outline-none focus:ring-4 focus:ring-indigo-500/10
+                 focus:border-indigo-500
+                 transition"
+          />
+
+          {search && (
+            <button
+              onClick={clearSearch}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
-
-        <input
-          type="text"
-          placeholder="Search by username..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-12 pr-12 py-4 bg-white border border-gray-100 rounded-[2rem] shadow-sm focus:ring-4 focus:ring-[#5865F2]/5 focus:border-[#5865F2] outline-none transition-all font-medium text-gray-700"
-        />
-
-        {/* Clear Search Button */}
-        {search.length > 0 && (
-          <button
-            onClick={clearSearch}
-            className="absolute inset-y-0 right-4 flex items-center px-2 text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X size={18} className="bg-gray-100 rounded-full p-0.5" />
-          </button>
-        )}
       </div>
 
       {/* Grid List */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {users.map((user) => (
           <Link
             key={user.id}
             href={`/profile/${user.id}`}
-            className="group bg-white p-6 rounded-[2.5rem] border border-gray-50 shadow-sm hover:shadow-2xl hover:shadow-[#5865F2]/10 hover:-translate-y-2 transition-all duration-300 text-center"
+            className="group bg-white border border-gray-200
+                 rounded-2xl p-4
+                 hover:border-indigo-200 hover:shadow-md
+                 transition"
           >
-            <div className="relative w-20 h-20 mx-auto mb-4 rounded-[1.8rem] overflow-hidden bg-gray-50 border-4 border-white group-hover:border-[#5865F2]/10 transition-all shadow-inner">
-              {user.avatar ? (
-                <Image
-                  src={user.avatar}
-                  alt={user.username}
-                  fill
-                  className="object-cover"
-                  unoptimized
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-[#5865F2]/5 text-[#5865F2]">
-                  <User size={32} />
-                </div>
-              )}
+            <div className="flex flex-col items-center text-center">
+              <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-gray-100 mb-3">
+                {user.avatar ? (
+                  <Image
+                    src={user.avatar}
+                    alt={user.username}
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400">
+                    <User size={20} />
+                  </div>
+                )}
+              </div>
+
+              <p className="text-sm font-medium text-gray-900 truncate w-full">
+                @{user.username}
+              </p>
             </div>
-            <h3 className="font-black text-gray-900 truncate text-sm">
-              @{user.username}
-            </h3>
-            <p className="text-[9px] font-black text-[#5865F2] uppercase tracking-widest mt-1 opacity-0 group-hover:opacity-100 transition-all duration-300">
-              View Profile
-            </p>
           </Link>
         ))}
       </div>
 
       {/* Loading & Status Sensor */}
-      <div
-        ref={ref}
-        className="py-12 flex flex-col items-center justify-center gap-4"
-      >
+      <div ref={ref} className="py-10 flex justify-center">
         {isLoading && (
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="animate-spin text-[#5865F2]" size={28} />
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-              Scanning Creators...
-            </span>
-          </div>
+          <Loader2 className="animate-spin text-indigo-500" size={22} />
         )}
 
         {!hasMore && users.length > 0 && (
-          <div className="flex flex-col items-center gap-2">
-            <div className="h-px w-12 bg-gray-200" />
-            <p className="text-xs font-bold text-gray-300">End of the list</p>
-          </div>
+          <p className="text-xs text-gray-400">You’ve reached the end</p>
         )}
 
         {!isLoading && users.length === 0 && (
-          <div className="text-center py-10">
-            <p className="text-gray-400 font-bold italic">
-              No creators found matching &quot;{debouncedSearch}&quot;
-            </p>
+          <div className="text-center text-sm text-gray-500">
+            No creators found for "{debouncedSearch}"
           </div>
         )}
       </div>
