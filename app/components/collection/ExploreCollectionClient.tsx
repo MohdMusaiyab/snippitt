@@ -82,26 +82,39 @@ const ExploreCollectionsClient = ({ initialData }: { initialData: any[] }) => {
   }, [inView, hasMore, isLoading, loadMore]);
 
   return (
-    <div className="space-y-10">
+    <div className="max-w-7xl mx-auto px-6 py-10 space-y-10">
+      {/* Page Header */}
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900">
+          Explore Collections
+        </h1>
+
+        <p className="text-sm text-gray-500 mt-1">
+          Discover curated snippets and collections created by the community.
+        </p>
+      </div>
+      
       {/* Search Bar */}
-      <div className="relative max-w-lg mx-auto">
+      <div className="relative max-w-md">
         <Search
-          className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400"
-          size={18}
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+          size={16}
         />
+
         <input
           type="text"
           placeholder="Search collections..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-12 pr-12 py-4 bg-white border border-gray-100 rounded-[2rem] shadow-sm focus:ring-4 focus:ring-[#5865F2]/5 outline-none font-medium transition-all"
+          className="w-full pl-10 pr-10 py-2.5 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition"
         />
+
         {search && (
           <button
             onClick={() => setSearch("")}
-            className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         )}
       </div>
@@ -112,7 +125,6 @@ const ExploreCollectionsClient = ({ initialData }: { initialData: any[] }) => {
         <CollectionCard
           collections={items}
           variant="grid"
-          showCoverImage={true}
         />
       </div>
 
