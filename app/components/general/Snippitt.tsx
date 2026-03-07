@@ -3,9 +3,10 @@ import Image from "next/image";
 import { Post } from "@/schemas/post";
 import { Visibility } from "@/schemas/post";
 import { VisibilityTag } from "./VisibilityTags";
-import { Edit, Trash, Share, MessageCircle, Ellipsis } from "lucide-react";
+import { Edit, Share, MessageCircle, Ellipsis } from "lucide-react";
 import LikeButton from "./LikeButton";
 import AddCollectionButton from "./AddCollectionButton";
+import DeleteSnippitButton from "./DeleteSnippitButton";
 import ToggleSaveButton from "./ToggleSaveButton";
 
 const DEFAULT_COVER_IMAGE = "/assets/default.svg";
@@ -86,8 +87,36 @@ flex flex-col sm:flex-row gap-4 p-4 group"
               </button>
 
               {menuOpen === post.id && (
-                <div className="absolute right-0 mt-2 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1">
+                <div
+                  className="absolute right-0 mt-2 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <AddCollectionButton postId={post.id} userId={post.user.id} />
+
+                  {isCurrentUsersPost && (
+                    <>
+                      <Link
+                        href={`/posts/${post.id}/edit`}
+                        className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-primary/10 hover:text-primary transition"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Edit size={16} className="mr-2" />
+                        Edit
+                      </Link>
+
+                      <DeleteSnippitButton
+                        postId={post.id}
+                      />
+                    </>
+                  )}
+
+                  <button
+                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-primary/10 hover:text-primary transition"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Share size={16} className="mr-2" />
+                    Share
+                  </button>
                 </div>
               )}
             </div>
@@ -108,7 +137,10 @@ flex flex-col sm:flex-row gap-4 p-4 group"
         <div className="flex-1 min-w-0 flex flex-col justify-between sm:pr-8">
           {/* Title + Description */}
           <div>
-            <Link href={`/posts/${post.id}`} className="font-semibold text-gray-900 truncate group-hover:text-primary transition">
+            <Link
+              href={`/posts/${post.id}`}
+              className="font-semibold text-gray-900 truncate group-hover:text-primary transition"
+            >
               {post.title}
             </Link>
 
@@ -134,7 +166,7 @@ flex flex-col sm:flex-row gap-4 p-4 group"
                 initialLikeCount={post._count.likes}
               />
 
-              {/* Comments */}
+              {/* to be implemented */}
               <div className="flex items-center">
                 <div className="w-8 h-8 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center transition hover:bg-white hover:shadow-md">
                   <MessageCircle
@@ -207,7 +239,7 @@ flex flex-col sm:flex-row gap-4 p-4 group"
                   {isCurrentUsersPost && (
                     <>
                       <Link
-                        href={`/post/${post.id}/edit`}
+                        href={`/posts/${post.id}/edit`}
                         className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-primary/10 hover:text-primary transition"
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -215,18 +247,11 @@ flex flex-col sm:flex-row gap-4 p-4 group"
                         Edit
                       </Link>
 
-                      <button
-                        className="flex items-center w-full px-4 py-2 text-sm text-red-500 hover:bg-primary/10 hover:text-primary transition"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                        }}
-                      >
-                        <Trash size={16} className="mr-2" />
-                        Delete
-                      </button>
+                      <DeleteSnippitButton postId={post.id}/>
                     </>
                   )}
 
+                  {/* to be implemented */}
                   <button
                     className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-primary/10 hover:text-primary transition"
                     onClick={(e) => e.stopPropagation()}
@@ -312,6 +337,7 @@ flex flex-col sm:flex-row gap-4 p-4 group"
               initialLikeCount={post._count.likes}
             />
 
+            {/* to be implemented */}
             <div className="flex items-center">
               <div className="w-8 h-8 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center transition hover:bg-white hover:shadow-md">
                 <MessageCircle
