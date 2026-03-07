@@ -1,4 +1,4 @@
-export type ActiveTab = 'home' | 'explore' | 'library' | 'saved';
+export type ActiveTab = 'home' | 'explore' | 'my-posts' | 'my-collections' | 'saved';
 
 export interface Collection {
   id: string;

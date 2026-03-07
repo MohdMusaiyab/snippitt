@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, Compass, BookOpen, Bookmark, Plus } from "lucide-react";
+import { Home, Compass, BookOpen, Bookmark, Plus, FileText } from "lucide-react";
 import { ActiveTab } from "@/types";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -17,7 +17,16 @@ interface SidebarProps {
 const navItems: { label: string; tab: ActiveTab; icon: React.ReactNode }[] = [
   { label: "Home", tab: "home", icon: <Home className="w-5 h-5" /> },
   { label: "Explore", tab: "explore", icon: <Compass className="w-5 h-5" /> },
-  { label: "Library", tab: "library", icon: <BookOpen className="w-5 h-5" /> },
+  {
+    label: "My Posts",
+    tab: "my-posts",
+    icon: <FileText className="w-5 h-5" />,
+  },
+  {
+    label: "My Collections",
+    tab: "my-collections",
+    icon: <BookOpen className="w-5 h-5" />,
+  },
   { label: "Saved", tab: "saved", icon: <Bookmark className="w-5 h-5" /> },
 ];
 
@@ -58,11 +67,13 @@ export const Sidebar = ({ activeTab, setActiveTab, userId }: SidebarProps) => {
               const href =
                 tab === "home"
                   ? "/dashboard"
-                  : tab === "library"
-                    ? "/my-collections"
-                    : tab === "saved"
-                      ? "/saved"
-                      : "#";
+                  : tab === "my-posts"
+                    ? "/my-posts"
+                    : tab === "my-collections"
+                      ? "/my-collections"
+                      : tab === "saved"
+                        ? "/saved"
+                        : "#";
 
               return (
                 <li key={tab} className="flex-1">
@@ -224,11 +235,13 @@ export const Sidebar = ({ activeTab, setActiveTab, userId }: SidebarProps) => {
                   href={
                     tab === "home"
                       ? "/dashboard"
-                      : tab === "library"
-                        ? "/my-collections"
-                        : tab === "saved"
-                          ? "/saved"
-                          : "#"
+                      : tab === "my-posts"
+                        ? "/my-posts"
+                        : tab === "my-collections"
+                          ? "/my-collections"
+                          : tab === "saved"
+                            ? "/saved"
+                            : "#"
                   }
                   onClick={() => setActiveTab(tab)}
                   className={`flex items-center gap-3 py-3 px-4 rounded-lg text-[15px] font-medium
