@@ -1,23 +1,20 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Collection } from "@/types";
 import {
-  Eye,
-  Lock,
-  Users,
   FileText,
   ChevronRight,
   Folder,
-  Edit3,
   Edit,
   Trash,
   Share,
   Ellipsis,
 } from "lucide-react";
-import { VisibilityTag } from "./VisibilityTags";
+import { VisibilityTag } from "../general/VisibilityTags";
+import DeleteCollectionButton from "./DeleteCollectionButton";
 
 const DEFAULT_COVER_IMAGE = "/assets/defaultcollectioncover.svg";
 
@@ -56,10 +53,6 @@ export const Collections = ({
 
   const toggleMenu = (id: string) => {
     setMenuOpen((prev) => (prev === id ? null : id));
-  };
-
-  const handleDeleteCollection = (id: string) => {
-    console.log("delete collection", id);
   };
 
   const handleShareCollection = (id: string) => {
@@ -142,22 +135,14 @@ export const Collections = ({
                           {isOwner && (
                             <>
                               <Link
-                                href={`/collection/${collection.id}/edit`}
+                                href={`/collections/${collection.id}/edit`}
                                 className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-primary/10 hover:text-primary"
                               >
                                 <Edit size={16} className="mr-2" />
                                 Edit
                               </Link>
 
-                              <button
-                                className="flex items-center w-full px-4 py-2 text-sm text-red-500 hover:bg-red-50"
-                                onClick={() =>
-                                  handleDeleteCollection(collection.id)
-                                }
-                              >
-                                <Trash size={16} className="mr-2" />
-                                Delete
-                              </button>
+                              <DeleteCollectionButton collectionId={collection.id} />
                             </>
                           )}
 

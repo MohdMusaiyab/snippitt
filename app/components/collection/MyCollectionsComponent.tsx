@@ -1,78 +1,46 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useTransition } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { getUserCollections } from "@/actions/collection/getUserCollections";
-import { Collections } from "@/app/components/general/Collection";
+import Link from "next/link";
+import { Collections } from "@/app/components/collection/Collection";
 import { FolderHeart, ChevronLeft, ChevronRight } from "lucide-react";
 import Button from "@/app/components/Button";
 
-const MyCollectionsPage = () => {
+interface MyCollectionsComponentProps {
+  initialData: any;
+  filters: { currentPage: number; visibility: string };
+}
+
+const MyCollectionsComponent = ({ initialData, filters }: MyCollectionsComponentProps) => {
+  const { visibility } = filters;
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const [loading, setLoading] = useState(true);
-  const [initialLoading, setInitialLoading] = useState(true);
-  const [collections, setCollections] = useState<any[]>([]);
-  const [pagination, setPagination] = useState({
-    currentPage: 1,
-    pages: 0,
-    total: 0,
-  });
-  const [isOwner, setIsOwner] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const collections = initialData?.collections || [];
+  const pagination = initialData?.pagination || { currentPage: 1, pages: 0, total: 0 };
+  const isOwner = initialData?.isOwner || false;
 
-  const currentPage = parseInt(searchParams.get("page") || "1");
-  const visibility = searchParams.get("visibility") || "";
-
-  const fetchCollections = useCallback(
-    async (page: number, visibilityFilter: string = "") => {
-      try {
-        setLoading(true);
-
-        const result = await getUserCollections({
-          page,
-          perPage: 12,
-          visibility: visibilityFilter as any,
-        });
-
-        if (result.success && result.data) {
-          setCollections(result.data.collections);
-          setPagination(result.data.pagination);
-          setIsOwner(result.data.isOwner);
-        }
-      } catch (error) {
-        console.error("Error fetching collections:", error);
-      } finally {
-        setLoading(false);
-        if (initialLoading) setInitialLoading(false);
-      }
-    },
-    [initialLoading],
-  );
-
-  useEffect(() => {
-    fetchCollections(currentPage, visibility);
-  }, [currentPage, visibility, fetchCollections]);
-
-  const goToPage = (page: number) => {
+  // Helper to update URL and trigger Server Component re-fetch
+  const updateFilters = (newParams: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString());
-    params.set("page", page.toString());
-    router.push(`?${params.toString()}`);
-  };
+    
+    Object.entries(newParams).forEach(([key, value]) => {
+      if (value) params.set(key, value);
+      else params.delete(key);
+    });
 
-  const handleVisibilityFilter = (value: string) => {
-    const params = new URLSearchParams(searchParams.toString());
+    // Always reset to page 1 when changing filters (unless specifically navigating pages)
+    if (!newParams.page) params.set("page", "1");
 
-    params.set("page", "1");
-
-    if (value) params.set("visibility", value);
-    else params.delete("visibility");
-
-    router.push(`?${params.toString()}`);
+    startTransition(() => {
+      router.push(`?${params.toString()}`);
+    });
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-10 space-y-10">
+    <div className={`max-w-7xl mx-auto px-6 py-10 space-y-10 transition-opacity ${isPending ? "opacity-60" : "opacity-100"}`}>
 
       {/* Header */}
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -92,7 +60,7 @@ const MyCollectionsPage = () => {
         {["", "PUBLIC", "PRIVATE", "FOLLOWERS", "DRAFT"].map((type) => (
           <button
             key={type || "ALL"}
-            onClick={() => handleVisibilityFilter(type)}
+            onClick={() => updateFilters({ visibility: type || null })}
             className={`px-3 py-1.5 text-xs rounded-full border transition ${
               visibility === type
                 ? "bg-[#5865F2] text-white border-[#5865F2]"
@@ -106,14 +74,21 @@ const MyCollectionsPage = () => {
 
       {/* Content */}
       {collections.length === 0 ? (
-        <div className="bg-white rounded-2xl border p-12 text-center">
+        <div className="bg-white rounded-2xl border border-dashed border-primary/50 p-12 text-center">
           <FolderHeart className="w-10 h-10 text-gray-400 mx-auto mb-4" />
 
           <h3 className="text-xl font-semibold">No collections yet</h3>
 
-          <p className="text-gray-600 mt-2">
+          <p className="text-gray-600 m-2">
             Create collections to organize your favorite snippets.
           </p>
+
+          <Button
+          variant="primary" size="md">
+            <Link href="/explore/posts" className="flex items-center gap-2">
+            Explore Posts
+            </Link>
+          </Button>
         </div>
       ) : (
         <Collections
@@ -134,7 +109,7 @@ const MyCollectionsPage = () => {
           <div className="flex items-center gap-2">
 
             <Button
-              onClick={() => goToPage(pagination.currentPage - 1)}
+              onClick={() => updateFilters({ page: (pagination.currentPage - 1).toString() })}
               disabled={pagination.currentPage === 1}
               variant="outline"
               size="sm"
@@ -143,7 +118,7 @@ const MyCollectionsPage = () => {
             </Button>
 
             <Button
-              onClick={() => goToPage(pagination.currentPage + 1)}
+              onClick={() => updateFilters({ page: (pagination.currentPage + 1).toString() })}
               disabled={pagination.currentPage === pagination.pages}
               variant="outline"
               size="sm"
@@ -158,4 +133,4 @@ const MyCollectionsPage = () => {
   );
 };
 
-export default MyCollectionsPage;
+export default MyCollectionsComponent;

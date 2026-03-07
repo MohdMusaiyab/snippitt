@@ -1,11 +1,32 @@
 import MyCollectionsComponent from "@/app/components/collection/MyCollectionsComponent";
+import { getUserCollections } from "@/actions/collection/getUserCollections";
 
-const page = () => {
+interface PageProps {
+  searchParams: Promise<{
+    page?: string;
+    visibility?: string;
+  }>;
+}
+
+const Page = async ({ searchParams }: PageProps) => {
+  const params = await searchParams;
+  const currentPage = parseInt(params.page || "1");
+  const visibility = params.visibility || "";
+
+  const result = await getUserCollections({
+    page: currentPage,
+    perPage: 12,
+    visibility: visibility as any,
+  });
+
+  const initialData = result.success ? result.data : null;
+
   return (
-    <div>
-      <MyCollectionsComponent />
-    </div>
+    <MyCollectionsComponent 
+      initialData={initialData} 
+      filters={{ currentPage, visibility }} 
+    />
   );
 };
 
-export default page;
+export default Page;
