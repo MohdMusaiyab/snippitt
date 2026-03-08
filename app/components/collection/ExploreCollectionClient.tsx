@@ -5,7 +5,7 @@ import { Search, Loader2, FolderOpen, X } from "lucide-react";
 import { useInView } from "react-intersection-observer";
 import { getExploreCollections } from "@/actions/collection/exploreCollections";
 import { useDebounce } from "@/hooks/use-debounce";
-import { Collections as CollectionCard } from "@/app/components/general/Collection";
+import { Collections as CollectionCard } from "@/app/components/collection/Collection";
 
 const ExploreCollectionsClient = ({ initialData }: { initialData: any[] }) => {
   // --- State Management ---

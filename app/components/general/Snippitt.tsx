@@ -3,11 +3,17 @@ import Image from "next/image";
 import { Post } from "@/schemas/post";
 import { Visibility } from "@/schemas/post";
 import { VisibilityTag } from "./VisibilityTags";
-import { Edit, Share, MessageCircle, Ellipsis } from "lucide-react";
+import {
+  Edit,
+  MessageCircle,
+  Ellipsis,
+  Clock,
+} from "lucide-react";
 import LikeButton from "./LikeButton";
 import AddCollectionButton from "./AddCollectionButton";
 import DeleteSnippitButton from "./DeleteSnippitButton";
 import ToggleSaveButton from "./ToggleSaveButton";
+import ShareActionButton from "./ShareActionButton";
 
 const DEFAULT_COVER_IMAGE = "/assets/default.svg";
 
@@ -69,7 +75,7 @@ const Snippet = ({
       <div
         className="relative bg-white border border-gray-100 rounded-xl 
 hover:border-gray-200 hover:shadow-sm transition-all cursor-pointer 
-flex flex-col sm:flex-row gap-4 p-4 group"
+flex flex-col sm:flex-row gap-4 p-2 group"
         onClick={handleCardClick}
       >
         {/* Top-right menu button */}
@@ -104,19 +110,15 @@ flex flex-col sm:flex-row gap-4 p-4 group"
                         Edit
                       </Link>
 
-                      <DeleteSnippitButton
-                        postId={post.id}
-                      />
+                      <DeleteSnippitButton postId={post.id} />
                     </>
                   )}
 
-                  <button
-                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-primary/10 hover:text-primary transition"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Share size={16} className="mr-2" />
-                    Share
-                  </button>
+                  <ShareActionButton
+                    postId={post.id} 
+                    postTitle={post.title} 
+                    postDescription={post.description}
+                  />
                 </div>
               )}
             </div>
@@ -197,7 +199,7 @@ flex flex-col sm:flex-row gap-4 p-4 group"
   return (
     <div
       key={post.id}
-      className="group bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md overflow-hidden transition-shadow cursor-pointer"
+      className="group bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md overflow-hidden transition-shadow cursor-pointer"
       onClick={handleCardClick}
     >
       {/* Cover Image */}
@@ -212,14 +214,23 @@ flex flex-col sm:flex-row gap-4 p-4 group"
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         />
 
+        {/* Floating Category Badge */}
+        {post.category && (
+          <div className="absolute top-3 left-3 z-10">
+            <span className="backdrop-blur-md bg-white/70 text-[10px] font-bold uppercase tracking-wider text-gray-800 px-2.5 py-1 rounded-lg shadow-sm">
+              {post.category}
+            </span>
+          </div>
+        )}
+
         {/* Top-right Buttons */}
         {showActions && (
-          <div className="absolute top-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition">
+          <div className="absolute top-3 right-3 z-10 transition">
             <div className="relative">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  toggleMenu(post.id);
+                  toggleMenu(menuOpen === post.id ? "" : post.id);
                 }}
                 className="w-8 h-8 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white hover:shadow-md"
                 aria-label="More options"
@@ -247,18 +258,15 @@ flex flex-col sm:flex-row gap-4 p-4 group"
                         Edit
                       </Link>
 
-                      <DeleteSnippitButton postId={post.id}/>
+                      <DeleteSnippitButton postId={post.id} />
                     </>
                   )}
 
-                  {/* to be implemented */}
-                  <button
-                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-primary/10 hover:text-primary transition"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Share size={16} className="mr-2" />
-                    Share
-                  </button>
+                  <ShareActionButton
+                    postId={post.id} 
+                    postTitle={post.title} 
+                    postDescription={post.description}
+                  />
                 </div>
               )}
             </div>
@@ -267,97 +275,90 @@ flex flex-col sm:flex-row gap-4 p-4 group"
       </div>
 
       {/* Content */}
-      <div className="p-5">
-        {/* User Info */}
-        <div className="flex items-center gap-3 mb-3">
-          <Link
-            href={`/profile/${post.user.id}`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-8 h-8 bg-primary/20 overflow-hidden rounded-full">
-              {post.user.avatar ? (
-                <Image
-                  src={post.user.avatar}
-                  alt={post.user.username}
-                  className="w-full h-full object-cover"
-                  width={32}
-                  unoptimized={true}
-                  height={32}
-                />
-              ) : (
-                <span className="w-full h-full flex items-center justify-center text-sm font-semibold text-gray-700">
-                  {post.user.username.charAt(0).toUpperCase()}
-                </span>
-              )}
-            </div>
-          </Link>
-          <div>
+      <div className="p-5 flex flex-col flex-grow bg-white rounded-b-2xl">
+        <div className="flex justify-between items-start mb-3">
+          <div className="flex items-center gap-2">
             <Link
               href={`/profile/${post.user.id}`}
               onClick={(e) => e.stopPropagation()}
             >
-              <h4 className="font-semibold text-gray-900 hover:text-primary transition">
-                {post.user.username}
-              </h4>
+              <div className="relative w-8 h-8 rounded-full overflow-hidden border border-gray-100 bg-gray-50">
+                {post.user.avatar ? (
+                  <Image
+                    src={post.user.avatar}
+                    alt="User"
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
+                ) : (
+                  <div className="bg-indigo-50 w-full h-full flex items-center justify-center text-sm font-bold text-indigo-600">
+                    {post.user.username.charAt(0).toUpperCase()}
+                  </div>
+                )}
+              </div>
             </Link>
-            <p className="text-xs text-gray-500">{timeAgo(post.createdAt)}</p>
+
+            <Link
+              href={`/profile/${post.user.id}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="text-sm font-medium text-gray-700 hover:text-indigo-600 transition">
+                {post.user.username}
+              </p>
+            </Link>
+          </div>
+          <div className="flex items-center text-[11px] text-gray-400 gap-1">
+            <Clock size={12} />
+            {timeAgo(post.createdAt)}
           </div>
         </div>
 
-        {/* Post Title & Description */}
         <Link
           href={post.linkTo || `/post/${post.id}`}
           onClick={(e) => e.stopPropagation()}
         >
-          <h3 className="font-semibold text-gray-900 mb-1 hover:text-primary transition line-clamp-1">
+          <h3 className="text-base font-bold text-gray-900 leading-tight mb-2 group-hover:text-indigo-600 transition-colors line-clamp-1">
             {post.title}
           </h3>
         </Link>
-        <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+
+        <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed mb-4">
           {post.description}
         </p>
 
-        {/* Footer - Visibility & Stats */}
-        <div className="flex items-center justify-between">
-          <VisibilityTag visibility={post.visibility as Visibility} />
-
-          {post.isDraft && (
-            <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full">
-              Draft
-            </span>
-          )}
-
-          <div
-            className="flex items-center gap-2 text-sm text-zinc-400"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <LikeButton
-              postId={post.id}
-              initialIsLiked={post.isLiked}
-              initialLikeCount={post._count.likes}
-            />
-
-            {/* to be implemented */}
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center transition hover:bg-white hover:shadow-md">
-                <MessageCircle
-                  size={18}
-                  strokeWidth={2}
-                  className="stroke-gray-500 hover:stroke-primary transition"
-                />
-              </div>
-
-              <span className="text-xs tabular-nums text-gray-500">
+        {/* 3. Footer Section */}
+        <div className="mt-auto pt-4 border-t border-gray-50 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div
+              className="flex items-center gap-1"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <LikeButton
+                postId={post.id}
+                initialIsLiked={post.isLiked}
+                initialLikeCount={post._count.likes}
+              />
+            </div>
+            <div
+              className="flex items-center gap-1.5 text-gray-400 hover:text-indigo-500 transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MessageCircle size={16} />
+              <span className="text-xs font-semibold tabular-nums">
                 {post._count.comments}
               </span>
             </div>
-
-            <ToggleSaveButton
-              postId={post.id}
-              initialIsSaved={post.isSaved}
-              initialSaveCount={post._count.savedBy}
-            />
+            <div onClick={(e) => e.stopPropagation()}>
+              <ToggleSaveButton
+                postId={post.id}
+                initialIsSaved={post.isSaved}
+                initialSaveCount={post._count.savedBy}
+              />
+            </div>
           </div>
+
+          <VisibilityTag visibility={post.visibility} />
         </div>
 
         {/* Tags */}
@@ -371,9 +372,9 @@ flex flex-col sm:flex-row gap-4 p-4 group"
                   query: { tag },
                 }}
                 onClick={(e) => e.stopPropagation()}
-                className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition"
+                className="text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 px-2 py-0.5 rounded-md flex items-center gap-0.5"
               >
-                {tag}
+                #{tag}
               </Link>
             ))}
 

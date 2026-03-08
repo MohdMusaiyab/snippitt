@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { Plus, FolderHeart, LayoutGrid, List, Search } from "lucide-react";
-import { Collections } from "@/app/components/general/Collection";
+import { Collections } from "@/app/components/collection/Collection";
 import Button from "@/app/components/Button";
 import Link from "next/link";
 import { motion } from "framer-motion";

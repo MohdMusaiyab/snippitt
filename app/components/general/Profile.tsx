@@ -13,7 +13,7 @@ import {
   X as CloseIcon,
 } from "lucide-react";
 import Snippet from "@/app/components/general/Snippitt";
-import { Collections } from "@/app/components/general/Collection";
+import { Collections } from "@/app/components/collection/Collection";
 import FollowButton from "./FollowButton";
 import CategoryChart from "./CategoryChart";
 import { updateUserProfile } from "@/actions/user/updateUserProfile";
