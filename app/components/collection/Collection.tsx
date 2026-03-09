@@ -9,12 +9,11 @@ import {
   ChevronRight,
   Folder,
   Edit,
-  Trash,
-  Share,
   Ellipsis,
 } from "lucide-react";
 import { VisibilityTag } from "../general/VisibilityTags";
 import DeleteCollectionButton from "./DeleteCollectionButton";
+import ShareActionButton from "../general/ShareActionButton";
 
 const DEFAULT_COVER_IMAGE = "/assets/defaultcollectioncover.svg";
 
@@ -55,10 +54,6 @@ export const Collections = ({
     setMenuOpen((prev) => (prev === id ? null : id));
   };
 
-  const handleShareCollection = (id: string) => {
-    console.log("share collection", id);
-  };
-
   if (!collections?.length) {
     return (
       <div className="rounded-xl border border-gray-200 bg-gray-50 p-16 text-center">
@@ -97,7 +92,7 @@ export const Collections = ({
           return (
             <div
               key={collection.id}
-              className="group bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md overflow-hidden transition-shadow cursor-pointer"
+              className="group bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md overflow-hidden transition-shadow cursor-pointer"
               onClick={() =>
                 window.open(`/collection/${collection.id}`, "_blank")
               }
@@ -115,14 +110,14 @@ export const Collections = ({
 
                 {/* Top Right Menu */}
                 {showActions && (
-                  <div className="absolute top-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition">
+                  <div className="absolute top-3 right-3 z-10 transition">
                     <div className="relative">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           toggleMenu(collection.id);
                         }}
-                        className="w-8 h-8 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white hover:shadow-md"
+                        className="w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white hover:shadow-md"
                       >
                         <Ellipsis size={18} color="#4b5563" />
                       </button>
@@ -142,17 +137,17 @@ export const Collections = ({
                                 Edit
                               </Link>
 
-                              <DeleteCollectionButton collectionId={collection.id} />
+                              <DeleteCollectionButton
+                                collectionId={collection.id}
+                              />
                             </>
                           )}
 
-                          <button
-                            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-primary/10 hover:text-primary"
-                            onClick={() => handleShareCollection(collection.id)}
-                          >
-                            <Share size={16} className="mr-2" />
-                            Share
-                          </button>
+                          <ShareActionButton
+                            id={collection.id}
+                            title={collection.name}
+                            url={`${process.env.NEXT_PUBLIC_APP_URL}/posts/${collection.id}`}
+                          />
                         </div>
                       )}
                     </div>
@@ -190,7 +185,7 @@ export const Collections = ({
                 </div>
 
                 {/* Title */}
-                <h3 className="font-semibold text-gray-900 mb-1 hover:text-primary transition line-clamp-1">
+                <h3 className="font-bold text-gray-900 mb-1 hover:text-primary transition line-clamp-1">
                   {collection.name}
                 </h3>
 
