@@ -1,187 +1,169 @@
 "use client";
-
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Search, Bookmark, Loader2, ArrowLeft } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useState, useTransition } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import {
+  Bookmark,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  Plus,
+  RefreshCw,
+  Filter,
+  X,
+} from "lucide-react";
 import Snippet from "@/app/components/general/Snippitt";
-import { getSavedPosts } from "@/actions/posts/getSavedPost";
-import type { Post } from "@/schemas/post";
 import Button from "@/app/components/Button";
-import Link from "next/link";
+import { Category } from "@/app/generated/prisma/enums";
 
-interface SavedPostsClientProps {
-  initialPosts: Post[];
-  initialPagination: any;
-  currentUserId: string;
+interface SavedPostsProps {
+  initialData: any;
+  filters: { currentPage: number; category: string };
 }
 
-const SavedPosts = ({
-  initialPosts,
-  initialPagination,
-  currentUserId,
-}: SavedPostsClientProps) => {
-  const [posts, setPosts] = useState<Post[]>(initialPosts);
-  const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(
-    initialPagination
-      ? initialPagination.currentPage < initialPagination.pages
-      : false,
-  );
-  const [searchTerm, setSearchTerm] = useState("");
+const SavedPosts = ({ initialData, filters }: SavedPostsProps) => {
+  const { currentPage, category } = filters;
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [isPending, startTransition] = useTransition();
+
+  const posts = initialData?.posts || [];
+  const pagination = initialData?.pagination || { pages: 0 };
+  const currentUserId = initialData?.currentUserId || "";
+
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
 
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
-  const isFirstRender = useRef(true);
+  const updateFilters = (newParams: Record<string, string | null>) => {
+    const params = new URLSearchParams(searchParams.toString());
 
-  const fetchSaved = useCallback(
-    async (pageNum: number, search: string, isAppend: boolean = false) => {
-      try {
-        if (isAppend) setLoadingMore(true);
-        else setLoading(true);
+    Object.entries(newParams).forEach(([key, value]) => {
+      if (value) params.set(key, value);
+      else params.delete(key);
+    });
 
-        const result = await getSavedPosts({
-          page: pageNum,
-          perPage: 10,
-          search: search,
-        });
+    // Always reset to page 1 when changing filters (unless specifically navigating pages)
+    if (!newParams.page) params.set("page", "1");
 
-        if (result.success && result.data) {
-          setPosts((prev) =>
-            isAppend ? [...prev, ...result.data!.posts] : result.data!.posts,
-          );
-          setHasMore(
-            result.data.pagination.currentPage < result.data.pagination.pages,
-          );
-        }
-      } finally {
-        setLoading(false);
-        setLoadingMore(false);
-      }
-    },
-    [],
-  );
-
-  // Search logic
-  useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-    fetchSaved(1, searchTerm, false);
-  }, [searchTerm, fetchSaved]);
-
-  // Load more logic
-  useEffect(() => {
-    if (page > 1) {
-      fetchSaved(page, searchTerm, true);
-    }
-  }, [page, searchTerm, fetchSaved]);
-
-  const handleSearch = (val: string) => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setSearchTerm(val);
-      setPage(1);
-    }, 500);
+    startTransition(() => {
+      router.push(`?${params.toString()}`);
+    });
   };
 
+  const handleRefresh = () => {
+    startTransition(() => {
+      router.refresh();
+    });
+  };
+
+  const categories = Object.values(Category);
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+    <div className={`max-w-7xl mx-auto px-6 py-10 space-y-10 transition-opacity ${isPending ? "opacity-60" : "opacity-100"}`}>
+      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <Link
-            href="/explore/posts"
-            className="flex items-center text-sm text-gray-500 hover:text-[#5865F2] mb-2 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4 mr-1" /> Back to Explore
-          </Link>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-            <Bookmark className="w-8 h-8 mr-3 text-[#5865F2] fill-[#5865F2]/10" />
-            Saved Snippets
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900">
+            Saved Posts
           </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Your collection of saved posts. Manage and revisit your favorite snippets.
+          </p>
         </div>
+      </header>
 
-        <div className="relative w-full md:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-          <input
-            type="text"
-            placeholder="Search your saved posts..."
-            onChange={(e) => handleSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#5865F2]/20 outline-none transition-all"
-          />
+      {/* Filters + Controls */}
+      <section className="space-y-6">
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
+          {/* Category Dropdown */}
+          <div className="flex items-center gap-4">
+            <div className="relative w-72">
+              <Filter className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <select
+                value={category}
+                onChange={(e) => updateFilters({ category: e.target.value })}
+                className="w-full pl-11 pr-10 py-3 bg-white border border-gray-200 rounded-2xl text-sm text-gray-700 shadow-sm focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 appearance-none"
+              >
+                <option value="">All Categories</option>
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {category && (
+              <div className="flex items-center gap-2 bg-indigo-50 text-indigo-600 text-xs px-3 py-1.5 rounded-full">
+                {category}
+                <button onClick={() => updateFilters({ category: null })}>
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* View Toggle & Refresh */}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handleRefresh}
+              disabled={isPending}
+              className="p-2 hover:bg-gray-100 rounded-full transition"
+            >
+              <RefreshCw
+                className={`w-5 h-5 text-gray-600 ${isPending ? "animate-spin" : ""}`}
+              />
+            </button>
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* Grid Content */}
-      {loading && page === 1 ? (
+      {posts.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-dashed border-primary/50 p-12 text-center">
+          <FileText className="w-10 h-10 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold">No saved posts yet</h3>
+          <p className="text-gray-600 mb-6">
+            Explore posts to keep them saved with you.
+          </p>
+          <Button onClick={() => router.push("/explore/posts")}>
+            Explore Posts
+          </Button>
+        </div>
+      ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {[...Array(6)].map((_, i) => (
-            <div
-              key={i}
-              className="h-80 bg-gray-200 rounded-xl animate-pulse"
+          {posts.map((post: any) => (
+            <Snippet
+              key={post.id}
+              post={post}
+              menuOpen={menuOpen}
+              toggleMenu={setMenuOpen}
+              currentUserId={currentUserId}
             />
           ))}
         </div>
-      ) : posts.length > 0 ? (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <AnimatePresence mode="popLayout">
-              {posts.map((post) => (
-                <motion.div
-                  key={post.id}
-                  layout
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                >
-                  <Snippet
-                    post={post}
-                    currentUserId={currentUserId}
-                    menuOpen={menuOpen}
-                    toggleMenu={(id) =>
-                      setMenuOpen(menuOpen === id ? null : id)
-                    }
-                    showActions={true}
-                  />
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
+      )}
 
-          {hasMore && (
-            <div className="mt-12 text-center">
-              <Button
-                onClick={() => setPage((p) => p + 1)}
-                variant="primary"
-                disabled={loadingMore}
-                icon={loadingMore ? <Loader2 className="animate-spin" /> : null}
-              >
-                {loadingMore ? "Loading..." : "Load More Saved Posts"}
-              </Button>
-            </div>
-          )}
-        </>
-      ) : (
-        <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200">
-          <Bookmark className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900">
-            No saved snippets found
-          </h3>
-          <p className="text-gray-500 mt-1">
-            {searchTerm
-              ? "Try a different search term."
-              : "Snippets you save will appear here."}
+      {pagination.pages > 1 && (
+        <div className="flex justify-between items-center mt-10">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!pagination.hasNextPage || isPending}
+            onClick={() => updateFilters({ page: (pagination.currentPage - 1).toString() })}
+          >
+            <ChevronLeft size={16} />
+          </Button>
+
+          <p>
+            Page {currentPage} of {pagination.pages}
           </p>
-          {!searchTerm && (
-            <Link href="/explore">
-              <Button variant="primary" className="mt-6">
-                Explore Content
-              </Button>
-            </Link>
-          )}
+
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!pagination.hasPrevPage || isPending}
+            onClick={() => updateFilters({ page: (pagination.currentPage + 1).toString() })}
+          >
+            <ChevronRight size={16} />
+          </Button>
         </div>
       )}
     </div>

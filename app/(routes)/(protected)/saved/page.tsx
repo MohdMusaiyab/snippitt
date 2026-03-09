@@ -1,19 +1,32 @@
-import { getSavedPosts } from "@/actions/posts/getSavedPost";
+import { getSavedPosts } from "@/actions/posts/getSavedPosts";
 import SavedPosts from "@/app/components/general/SavedPosts";
 
-export default async function SavedPage() {
-  const result = await getSavedPosts({ page: 1, perPage: 10 });
+interface PageProps {
+  searchParams: Promise<{
+    page?: string;
+    category?: string;
+  }>;
+}
 
-  const initialPosts = result.success ? result.data?.posts || [] : [];
-  const initialPagination = result.data?.pagination;
-  const currentUserId = result.data?.currentUserId || "";
+export default async function SavedPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+
+  const currentPage = parseInt(params.page || "1");
+  const category = params.category || "";
+
+  const result = await getSavedPosts({
+    page: currentPage,
+    perPage: 10,
+    category,
+  });
+
+  const initialData = result.success ? result.data : null;
 
   return (
     <main className="min-h-screen bg-gray-50">
       <SavedPosts
-        initialPosts={initialPosts}
-        initialPagination={initialPagination}
-        currentUserId={currentUserId}
+        initialData={initialData}
+        filters={{ currentPage, category }}
       />
     </main>
   );
