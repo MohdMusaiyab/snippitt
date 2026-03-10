@@ -10,6 +10,8 @@ import {
   ChevronRight,
   X,
   Filter,
+  Plus,
+  Search,
 } from "lucide-react";
 import Button from "@/app/components/Button";
 
@@ -62,84 +64,91 @@ const MyCollectionsComponent = ({
     <div
       className={`max-w-7xl mx-auto px-6 py-10 space-y-10 transition-opacity ${isPending ? "opacity-60" : "opacity-100"}`}
     >
-      {/* Header */}
-      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
+      {/* 1. Header + CTA */}
+      <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+        <div className="space-y-1">
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900">
             My Collections
           </h1>
-
-          <p className="text-sm text-gray-500 mt-1">
-            Organize and manage your saved snippets
+          <p className="text-sm text-gray-500">
+            Organize your favorite snippets into collections for easy access.
           </p>
         </div>
+
+        <Link href="/create-post">
+          <Button
+            variant="primary"
+            size="md"
+            className="flex items-center gap-2 w-full sm:w-auto whitespace-nowrap rounded-xl shadow-sm shadow-indigo-200"
+          >
+            <Plus size={18} />
+            <span>New Post</span>
+          </Button>
+        </Link>
       </header>
 
-      {/* Search & Sort */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-        {/* Search */}
-        <div className="relative w-full sm:w-80">
-          <input
-            type="text"
-            placeholder="Search collections..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                updateFilters({ search: searchInput });
+      {/* 2. Search + Filters + Sorting */}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+          <div className="relative group flex-1 lg:w-72">
+            <Search
+              size={16}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#5865F2] transition-colors"
+            />
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) =>
+                e.key === "Enter" && updateFilters({ search: searchInput })
               }
-            }}
-            className="w-full pl-4 pr-10 py-3 bg-white border border-gray-200 rounded-2xl text-sm text-gray-700 shadow-sm focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 appearance-none"
-          />
-          {searchInput && (
-            <button
-              onClick={() => {
-                setSearchInput("");
-                updateFilters({ search: null });
-              }}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+              className="w-full pl-10 pr-10 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/2 focus:border-[#5865F2] transition-all outline-none"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 sm:flex-none">
+              <select
+                value={sort}
+                onChange={(e) => updateFilters({ sort: e.target.value })}
+                className="w-full sm:w-auto pl-3 pr-8 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-600 hover:text-gray-900 appearance-none cursor-pointer outline-none"
+              >
+                <option value="desc">Sort: Newest</option>
 
-        {/* Sort */}
-        <div className="relative">
-          <select
-            value={sort}
-            onChange={(e) => updateFilters({ sort: e.target.value })}
-            className="pl-4 pr-10 py-3 bg-white border border-gray-200 rounded-2xl text-sm text-gray-700 shadow-sm focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 appearance-none"
-          >
-            <option value="desc">Newest First</option>
-            <option value="asc">Oldest First</option>
-          </select>
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-            <Filter className="w-4 h-4 text-gray-400" />
+                <option value="asc">Sort: Oldest</option>
+              </select>
+
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 hover:text-gray-900">
+                <ChevronRight size={14} className="rotate-90" />
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Visibility Filters */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {["", "PUBLIC", "PRIVATE", "FOLLOWERS", "DRAFT"].map((type) => (
-          <button
-            key={type || "ALL"}
-            onClick={() => updateFilters({ visibility: type || null })}
-            className={`px-3 py-1.5 text-xs rounded-full border transition ${
-              visibility === type
-                ? "bg-[#5865F2] text-white border-[#5865F2]"
-                : "bg-white text-gray-600 border-gray-200 hover:border-[#5865F2] hover:text-[#5865F2]"
-            }`}
-          >
-            {type || "ALL"}
-          </button>
-        ))}
+        {/* Visibility Filters */}
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
+          {["", "PUBLIC", "PRIVATE", "DRAFT"].map((type) => {
+            const isActive = (visibility || "") === type;
+            return (
+              <button
+                key={type || "ALL"}
+                onClick={() => updateFilters({ visibility: type || null })}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${
+                  isActive
+                    ? "bg-primary text-white"
+                    : "text-gray-500 hover:bg-gray-100"
+                }`}
+              >
+                {type || "ALL"}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Content */}
       {collections.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-dashed border-primary/50 p-12 text-center">
+        <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center">
           <FolderHeart className="w-10 h-10 text-gray-400 mx-auto mb-4" />
 
           <h3 className="text-xl font-semibold">No collections yet</h3>

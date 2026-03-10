@@ -412,7 +412,9 @@ flex flex-col sm:flex-row gap-4 sm:gap-2 p-2 group"
                   pathname: post.isDraft
                     ? `/posts/${post.id}/edit`
                     : "/explore/posts",
-                  query: { tag },
+                  query: post.isDraft
+                    ? ""
+                    : {tag},
                 }}
                 onClick={(e) => e.stopPropagation()}
                 className="text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 px-2 py-0.5 rounded-md flex items-center gap-0.5"

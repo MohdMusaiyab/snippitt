@@ -67,25 +67,29 @@ const DashboardClient = ({ data, currentUserId, currentUserName }: any) => {
           label="Total Posts"
           value={stats.postsCount}
           icon={<FileText size={18} />}
-          color="indigo"
+          color="text-indigo-600"
+          bg="bg-indigo-50"
         />
         <StatCard
           label="Followers"
           value={stats.followers}
           icon={<Users size={18} />}
-          color="violet"
+          color="text-violet-600"
+          bg="bg-violet-50"
         />
         <StatCard
           label="Following"
           value={stats.followings}
           icon={<Heart size={18} />}
-          color="rose"
+          color="text-rose-600"
+          bg="bg-rose-50"
         />
         <StatCard
           label="Drafts"
           value={drafts.length}
           icon={<PenLine size={18} />}
-          color="amber"
+          color="text-amber-600"
+          bg="bg-amber-50"
         />
       </div>
 
@@ -180,51 +184,17 @@ const DashboardClient = ({ data, currentUserId, currentUserName }: any) => {
 
 export default DashboardClient;
 
-const colorMap: Record<string, { bg: string; icon: string; badge: string }> = {
-  indigo: {
-    bg: "bg-indigo-50",
-    icon: "text-indigo-600",
-    badge: "bg-indigo-100 text-indigo-600",
-  },
-  violet: {
-    bg: "bg-violet-50",
-    icon: "text-violet-600",
-    badge: "bg-violet-100 text-violet-600",
-  },
-  rose: {
-    bg: "bg-rose-50",
-    icon: "text-rose-500",
-    badge: "bg-rose-100 text-rose-500",
-  },
-  amber: {
-    bg: "bg-amber-50",
-    icon: "text-amber-500",
-    badge: "bg-amber-100 text-amber-600",
-  },
-};
-
-function StatCard({ label, value, icon, color }: any) {
-  const c = colorMap[color];
-  return (
-    <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-      <div className="flex items-center justify-between">
-        {/* LATER */}
-        {/* {trend && (
-          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${c.badge}`}>
-          {trend}
-          </span>
-          )} */}
-        <div>
-          <p className="text-3xl font-black text-gray-900 tabular-nums">
-            {value}
-          </p>
-          <p className="text-xs text-gray-500 font-medium mt-0.5">{label}</p>
-        </div>
-        <div className={`p-2.5 rounded-xl ${c.bg} ${c.icon}`}>{icon}</div>
-      </div>
+const StatCard = ({ value, label, icon, color, bg }: any) => (
+  <div className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center gap-4 transition-all hover:border-indigo-100">
+    <div className={`p-2.5 ${bg} ${color} rounded-xl`}>{icon}</div>
+    <div>
+      <p className="text-xl font-bold text-gray-900 tabular-nums">{value}</p>
+      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+        {label}
+      </p>
     </div>
-  );
-}
+  </div>
+);
 
 function SectionHeader({ title, icon, href, count }: any) {
   return (
@@ -267,7 +237,7 @@ function PostRow({ post, menuOpen, toggleMenu, currentUserId }: any) {
 
 function DraftRow({ post }: any) {
   return (
-    <Link href={`/drafts/${post.id}`}>
+    <Link href={`/posts/${post.id}/edit`}>
       <div className="group flex items-center gap-3 p-3 rounded-xl hover:bg-white border border-transparent hover:border-gray-100 hover:shadow-sm transition-all cursor-pointer">
         <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-500 flex items-center justify-center flex-shrink-0">
           <PenLine size={14} />
@@ -293,7 +263,7 @@ function DraftRow({ post }: any) {
 
 function CollectionRow({ col }: any) {
   return (
-    <Link href={`/my-collections/${col.id}`}>
+    <Link href={`/collections/${col.id}`}>
       <div className="group flex items-center gap-3 p-3 rounded-xl hover:bg-white border border-transparent hover:border-gray-100 hover:shadow-sm transition-all cursor-pointer">
         <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center flex-shrink-0">
           <Folder size={14} />
@@ -303,7 +273,7 @@ function CollectionRow({ col }: any) {
             {col.name}
           </p>
           <p className="text-[11px] text-gray-400">
-            {col._count.snippets} items
+            {col._count.posts} items
           </p>
         </div>
         <ChevronRight

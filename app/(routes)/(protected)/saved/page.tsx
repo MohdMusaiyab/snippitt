@@ -1,5 +1,5 @@
 import { getSavedPosts } from "@/actions/posts/getSavedPosts";
-import SavedPosts from "@/app/components/general/SavedPosts";
+import SavedPosts from "@/app/components/posts/SavedPosts";
 
 interface PageProps {
   searchParams: Promise<{
