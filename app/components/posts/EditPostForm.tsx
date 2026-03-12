@@ -48,6 +48,7 @@ import { getTags, checkTagExists } from "@/actions/tags";
 
 interface FileWithMetadata {
   id: string;
+  name: string;
   file: File | null;
   preview: string;
   description: string;
@@ -162,6 +163,7 @@ const EditPostForm = () => {
     type: "image" | "video";
     name: string;
   } | null>(null);
+  const [previewError, setPreviewError] = useState(false);
 
   /* ── fetch tags ── */
   useEffect(() => {
@@ -259,21 +261,30 @@ const EditPostForm = () => {
             tags: d.tags || [],
           });
           setSelectedVisibility(d.visibility || "PRIVATE");
+          
+          d.images.forEach((img: any, i: number) => {console.log(`Image ${i}:`, img);});
+
           setFiles(
-            d.images.map((img: any, i: number) => ({
-              id: img.id || `existing-${i}`,
-              file: null,
-              preview: img.url,
-              description: img.description || "",
-              uploadProgress: 100,
-              isUploaded: true,
-              s3Url: img.url,
-              isCover: img.isCover || false,
-              fileType: img.url.match(/\.(mp4|webm|avi|mov)$/i)
-                ? "video"
-                : "image",
-              existingImageId: img.id,
-            })),
+            d.images.map((img: any, i: number) => {
+              const rawName = img.url.split("?")[0].split("/").pop() || `file-${i + 1}`;
+              const extractedName = rawName.split("-").slice(3).join("-") || rawName;
+
+              return {
+                id: img.id || `existing-${i}`,
+                name: extractedName,
+                file: null,
+                preview: img.url,
+                description: img.description || "",
+                uploadProgress: 100,
+                isUploaded: true,
+                s3Url: img.url,
+                isCover: img.isCover || false,
+                fileType: img.url.match(/\.(mp4|webm|avi|mov)$/i)
+                  ? "video"
+                  : "image",
+                existingImageId: img.id,
+              };
+            }),
           );
         } else {
           toast.error(result.message || "Failed to load post");
@@ -342,6 +353,7 @@ const EditPostForm = () => {
       // (You can remove your manual size check inside the filter now)
       const newFiles = accepted.map((f) => ({
         id: `new-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        name: f.name,
         file: f,
         preview: URL.createObjectURL(f),
         description: "",
@@ -434,7 +446,8 @@ const EditPostForm = () => {
           setFiles((prev) => [
             ...prev,
             {
-              id: `new-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+              name: file.name,
               file,
               preview, // ← data URL instead of blob URL
               description: "",
@@ -1412,13 +1425,14 @@ const EditPostForm = () => {
                             <div className="flex flex-col sm:flex-row items-start gap-3 p-4">
                               {/* Thumbnail */}
                               <div
-                                onClick={() =>
+                                onClick={() => {
                                   setPreviewFile({
                                     src: file.preview,
                                     type: file.fileType as "image" | "video",
-                                    name: file.file?.name || "Uploaded file",
-                                  })
-                                }
+                                    name: file.name || "Uploaded file",
+                                  });
+                                  setPreviewError(false);
+                                }}
                                 className="relative w-full sm:w-[72px] h-48 sm:h-[72px] rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 shadow-sm cursor-zoom-in group"
                               >
                                 {file.fileType === "image" ? (
@@ -1463,7 +1477,7 @@ const EditPostForm = () => {
                                       />
                                     )}
                                     <p className="text-sm font-semibold text-gray-900 truncate">
-                                      {file.file?.name || "Uploaded file"}
+                                      {file.name || "Uploaded file"}
                                     </p>
                                   </div>
 
@@ -1753,11 +1767,23 @@ const EditPostForm = () => {
             </div>
 
             {/* Media */}
-            <div className="rounded-2xl overflow-hidden bg-black flex items-center justify-center">
-              {previewFile.type === "image" ? (
+            <div className="rounded-2xl overflow-hidden bg-black flex items-center justify-center min-h-[200px]">
+              {previewError ? (
+                <div className="p-10 text-center space-y-3">
+                  <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center mx-auto">
+                    <ImageIcon size={22} className="text-white/40" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-white/70">
+                      Failed to load preview
+                    </p>
+                  </div>
+                </div>
+              ) : previewFile.type === "image" ? (
                 <img
                   src={previewFile.src}
                   alt={previewFile.name}
+                  onError={() => setPreviewError(true)}
                   className="max-h-[80vh] w-auto object-contain"
                 />
               ) : (
@@ -1765,6 +1791,7 @@ const EditPostForm = () => {
                   src={previewFile.src}
                   controls
                   autoPlay
+                  onError={() => setPreviewError(true)}
                   className="max-h-[80vh] w-full"
                 />
               )}
