@@ -37,6 +37,7 @@ export async function getPostById(postId: string) {
         _count: { select: { likes: true, comments: true, savedBy: true } },
         likes: currentUserId ? { where: { userId: currentUserId } } : false,
         savedBy: currentUserId ? { where: { userId: currentUserId } } : false,
+        tags: { include: { tag: { select: { name: true } } } },
       },
     });
 
@@ -92,6 +93,7 @@ export async function getPostById(postId: string) {
       images: signedImages,
       isLiked: currentUserId ? post.likes.length > 0 : false,
       isSaved: currentUserId ? post.savedBy.length > 0 : false,
+      tags: post.tags.map((pt) => pt.tag.name)
     };
 
     return {

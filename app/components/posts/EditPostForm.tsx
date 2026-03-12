@@ -350,8 +350,8 @@ const EditPostForm = () => {
       }
 
       // 3. Process the valid files
-      // (You can remove your manual size check inside the filter now)
-      const newFiles = accepted.map((f) => ({
+      // acception only first image as cover if multiple files are added at once
+      const newFiles = accepted.map((f, i) => ({
         id: `new-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         name: f.name,
         file: f,
@@ -359,7 +359,7 @@ const EditPostForm = () => {
         description: "",
         uploadProgress: 0,
         isUploaded: false,
-        isCover: files.length === 0 && detectFileType(f) === "image",
+        isCover: files.length === 0 && i === 0 && detectFileType(f) === "image",
         fileType: detectFileType(f),
       }));
 
