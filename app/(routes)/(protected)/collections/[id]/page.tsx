@@ -1,5 +1,5 @@
 import { getCollectionWithSnippets } from "@/actions/collection/getCollectionWithSnippites";
-import CollectionViewClient from "@/app/components/collection/CollectionViewClient";
+import CollectionDetailsClient from "@/app/components/collection/CollectionDetailsClient";
 import { authOptions } from "@/lib/auth-providers";
 import { getServerSession } from "next-auth";
 import { notFound } from "next/navigation";
@@ -17,7 +17,7 @@ export default async function CollectionViewPage({
   if (!result.success || !result.data) return notFound();
 
   return (
-    <CollectionViewClient
+    <CollectionDetailsClient
       collection={result.data.collection}
       snippets={result.data.snippets}
       currentUserId={currentUserId}

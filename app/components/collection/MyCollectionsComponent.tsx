@@ -127,7 +127,7 @@ const MyCollectionsComponent = ({
 
         {/* Visibility Filters */}
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
-          {["", "PUBLIC", "PRIVATE", "DRAFT"].map((type) => {
+          {["", "PUBLIC", "PRIVATE", "FOLLOWERS"].map((type) => {
             const isActive = (visibility || "") === type;
             return (
               <button

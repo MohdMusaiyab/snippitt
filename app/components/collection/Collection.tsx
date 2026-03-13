@@ -94,7 +94,7 @@ export const Collections = ({
               key={collection.id}
               className="group bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md overflow-hidden transition-shadow cursor-pointer"
               onClick={() =>
-                window.open(`/collection/${collection.id}`, "_blank")
+                window.open(`/collections/${collection.id}`, "_blank")
               }
             >
               {/* Cover */}
@@ -213,7 +213,7 @@ export const Collections = ({
         return (
           <Link
             key={collection.id}
-            href={`/collection/${collection.id}`}
+            href={`/collections/${collection.id}`}
             className="flex items-center gap-5 rounded-xl border border-gray-200 bg-white p-4 hover:shadow-md transition"
           >
             <div className="relative h-20 w-20 rounded-lg overflow-hidden">
