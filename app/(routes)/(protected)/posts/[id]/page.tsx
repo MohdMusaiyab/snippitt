@@ -3,6 +3,7 @@ import PostDetailClient from "@/app/components/posts/PostDetailsClient";
 import { notFound } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-providers";
+import { redirect } from "next/navigation";
 
 export default async function PostPage({ params }: { params: { id: string } }) {
   const { id } = await params;
@@ -23,6 +24,14 @@ export default async function PostPage({ params }: { params: { id: string } }) {
       );
     }
     return notFound();
+  }
+
+  if (result.data.isDraft && !result.isOwner) {
+    return notFound();
+  }
+
+  if (result.data.isDraft && result.isOwner) {
+    redirect(`/posts/${id}/edit`);
   }
 
   return (

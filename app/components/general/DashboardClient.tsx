@@ -86,7 +86,7 @@ const DashboardClient = ({ data, currentUserId, currentUserName }: any) => {
         />
         <StatCard
           label="Drafts"
-          value={drafts.length}
+          value={stats.draftsCount}
           icon={<PenLine size={18} />}
           color="text-amber-600"
           bg="bg-amber-50"

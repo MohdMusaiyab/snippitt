@@ -103,7 +103,7 @@ flex flex-col sm:flex-row gap-4 sm:gap-2 p-2 group"
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => toggleMenu(post.id)}
-                className="w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white hover:shadow-md"
+                className="w-8 h-8 bg-gray-100/50 rounded-full flex items-center justify-center hover:shadow-md"
               >
                 <Ellipsis size={16} className="text-gray-500" />
               </button>
@@ -160,7 +160,7 @@ flex flex-col sm:flex-row gap-4 sm:gap-2 p-2 group"
               href={
                 post.isDraft ? `/posts/${post.id}/edit` : `/posts/${post.id}`
               }
-              className="font-bold text-gray-900 truncate group-hover:text-primary transition"
+              className="block w-full font-bold text-gray-900 truncate group-hover:text-primary transition"
             >
               {post.title}
             </Link>
@@ -222,7 +222,7 @@ flex flex-col sm:flex-row gap-4 sm:gap-2 p-2 group"
   return (
     <div
       key={post.id}
-      className="group bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md overflow-hidden transition-shadow cursor-pointer"
+      className="group bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md overflow-hidden transition-shadow cursor-pointer flex flex-col"
       onClick={handleCardClick}
     >
       {/* Cover Image */}
@@ -299,7 +299,7 @@ flex flex-col sm:flex-row gap-4 sm:gap-2 p-2 group"
       </div>
 
       {/* Content */}
-      <div className="p-5 flex flex-col flex-grow bg-white rounded-b-2xl">
+      <div className="p-5 flex flex-col h-full bg-white rounded-b-2xl">
         <div className="flex justify-between items-start mb-3">
           <div className="flex items-center gap-2">
             <Link
