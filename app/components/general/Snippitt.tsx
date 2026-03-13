@@ -347,7 +347,7 @@ flex flex-col sm:flex-row gap-4 sm:gap-2 p-2 group"
           </h3>
         </Link>
 
-        <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed mb-4">
+        <p className="text-sm text-gray-500 line-clamp-1 leading-relaxed mb-4">
           {post.description}
         </p>
 
@@ -405,7 +405,7 @@ flex flex-col sm:flex-row gap-4 sm:gap-2 p-2 group"
         {/* Tags */}
         {post.tags && post.tags.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
-            {post.tags.slice(0, 3).map((tag) => (
+            {post.tags.slice(0, 2).map((tag) => (
               <Link
                 key={tag}
                 href={{
@@ -423,9 +423,9 @@ flex flex-col sm:flex-row gap-4 sm:gap-2 p-2 group"
               </Link>
             ))}
 
-            {post.tags.length > 3 && (
+            {post.tags.length > 2 && (
               <span className="px-2 py-1 text-xs text-gray-400">
-                +{post.tags.length - 3} more
+                +{post.tags.length - 2} more
               </span>
             )}
           </div>

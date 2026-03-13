@@ -150,7 +150,7 @@ const MyPostComponent = ({ initialData, filters }: MyPostComponentProps) => {
         </div>
 
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
-          {["", "PUBLIC", "PRIVATE", "DRAFT"].map((type) => {
+          {["", "PUBLIC", "PRIVATE", "FOLLOWERS", "DRAFT"].map((type) => {
             const isActive = (visibility || "") === type;
             return (
               <button

@@ -299,7 +299,6 @@ const PostDetailClient = ({ post, currentUserId }: any) => {
 
   useEffect(() => {
     setFormattedDate(format(new Date(post.createdAt), "MMM dd, yyyy"));
-    console.log("post visibility and isDraft:", post.visibility, post.isDraft);
   }, [post.createdAt]);
 
   useEffect(() => {
