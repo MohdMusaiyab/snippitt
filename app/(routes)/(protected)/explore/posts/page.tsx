@@ -1,5 +1,5 @@
 import { getExplorePosts } from "@/actions/posts/explore";
-import Explore from "@/app/components/general/Explore";
+import ExplorePostsClient from "@/app/components/posts/ExplorePostsClient";
 
 export default async function ExplorePage({
   searchParams,
@@ -17,7 +17,7 @@ export default async function ExplorePage({
   const initialPagination = result.data?.pagination;
 
   return (
-    <Explore
+    <ExplorePostsClient
       initialPosts={initialPosts}
       initialPagination={initialPagination}
       initialTag={tag || ""}

@@ -1,5 +1,5 @@
 import { getExploreCollections } from "@/actions/collection/exploreCollections";
-import ExploreCollectionsClient from "@/app/components/collection/ExploreCollectionClient";
+import ExploreCollectionsClient from "@/app/components/collection/ExploreCollectionsClient";
 
 export default async function ExploreCollectionsPage() {
   const result = await getExploreCollections(0, "");

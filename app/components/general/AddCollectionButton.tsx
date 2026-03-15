@@ -1,8 +1,16 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { createPortal } from "react-dom"; 
-import { Plus, FolderPlus, Check, Loader2, Folder } from "lucide-react";
+import { createPortal } from "react-dom";
+import {
+  Plus,
+  FolderPlus,
+  Check,
+  Loader2,
+  Folder,
+  Trash2,
+  X,
+} from "lucide-react";
 import {
   getUserCollectionNames,
   addNewPostToCollection,
@@ -23,13 +31,15 @@ interface AddCollectionButtonProps {
   userId: string;
 }
 
-const AddCollectionButton: React.FC<AddCollectionButtonProps> = ({ postId }) => {
+const AddCollectionButton: React.FC<AddCollectionButtonProps> = ({
+  postId,
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
-  const [mounted, setMounted] = useState(false); 
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -59,18 +69,44 @@ const AddCollectionButton: React.FC<AddCollectionButtonProps> = ({ postId }) => 
     return () => window.removeEventListener("keydown", handler);
   }, [isOpen]);
 
-  const handleTogglePost = async (collectionId: string, currentlyHasPost: boolean) => {
+  const handleTogglePost = async (
+    collectionId: string,
+    currentlyHasPost: boolean,
+  ) => {
+    const collectionName =
+      collections.find((c) => c.id === collectionId)?.name ?? "collection";
+
     try {
       if (currentlyHasPost) {
         const res = await removePostFromCollection(collectionId, postId);
         if (!res.success) throw new Error(res.error?.message);
-        toast.success("Removed from collection");
+
+        // Optimistic UI update
+        setCollections((prev) =>
+          prev.map((c) =>
+            c.id === collectionId ? { ...c, hasPost: false } : c,
+          ),
+        );
+        toast.success(`Removed from "${collectionName}"`, {
+          description: "The post has been removed from this collection.",
+        });
       } else {
         const res = await addNewPostToCollection(collectionId, postId);
         if (!res.success) throw new Error(res.error?.message);
-        toast.success("Added to collection");
+
+        // Optimistic UI update
+        setCollections((prev) =>
+          prev.map((c) =>
+            c.id === collectionId ? { ...c, hasPost: true } : c,
+          ),
+        );
+        toast.success(`Added to "${collectionName}"`, {
+          description: "You can view it in your collections.",
+        });
       }
-      setIsOpen(false);
+
+      // Small delay so user sees the checkmark update before modal closes
+      setTimeout(() => setIsOpen(false), 600);
     } catch (error: any) {
       toast.error(error.message || "Operation failed");
     }
@@ -97,8 +133,8 @@ const AddCollectionButton: React.FC<AddCollectionButtonProps> = ({ postId }) => 
 
   const modal = (
     <div
-      className="fixed inset-0 z-9999 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-      onClick={() =>{ setIsOpen(false)}}
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={() => setIsOpen(false)}
       onMouseDown={(e) => e.stopPropagation()}
     >
       <div
@@ -116,12 +152,12 @@ const AddCollectionButton: React.FC<AddCollectionButtonProps> = ({ postId }) => 
               type="text"
               placeholder="New collection name…"
               value={newCollectionName}
-              onChange={(e) => {setNewCollectionName(e.target.value);}}
+              onChange={(e) => setNewCollectionName(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleCreateNewCollection();
               }}
+              onClick={(e) => e.stopPropagation()}
               className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 transition-all"
-              onClick={(e)=>e.stopPropagation()}
             />
             <Button
               size="sm"
@@ -130,7 +166,11 @@ const AddCollectionButton: React.FC<AddCollectionButtonProps> = ({ postId }) => 
               disabled={isCreating || !newCollectionName.trim()}
               className="rounded-xl"
             >
-              {isCreating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+              {isCreating ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Plus size={14} />
+              )}
             </Button>
           </div>
 
@@ -145,23 +185,65 @@ const AddCollectionButton: React.FC<AddCollectionButtonProps> = ({ postId }) => 
                 <button
                   key={col.id}
                   onClick={() => handleTogglePost(col.id, !!col.hasPost)}
-                  className="flex items-center justify-between w-full px-3 py-2.5 rounded-xl border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50/50 transition-all text-left group"
+                  className={`flex items-center justify-between w-full px-3 py-2.5 rounded-xl border transition-all text-left group
+      ${
+        col.hasPost
+          ? "border-indigo-200 bg-indigo-50/50 hover:border-red-200 hover:bg-red-50/50"
+          : "border-gray-100 hover:border-indigo-200 hover:bg-indigo-50/50"
+      }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <Folder size={15} className="text-gray-400 group-hover:text-indigo-500 transition-colors shrink-0" />
-                    <span className="text-sm font-medium text-gray-700 group-hover:text-indigo-700 transition-colors">
+                    <Folder
+                      size={15}
+                      className={`shrink-0 transition-colors
+          ${
+            col.hasPost
+              ? "text-indigo-500 group-hover:text-red-400"
+              : "text-gray-400 group-hover:text-indigo-500"
+          }`}
+                    />
+                    <span
+                      className={`text-sm font-medium transition-colors
+          ${
+            col.hasPost
+              ? "text-indigo-700 group-hover:text-red-600"
+              : "text-gray-700 group-hover:text-indigo-700"
+          }`}
+                    >
                       {col.name}
                     </span>
                   </div>
-                  {col.hasPost && (
-                    <Check size={14} className="text-emerald-500 shrink-0" />
-                  )}
+
+                  {/* Right side indicator */}
+                  <div
+                    className={`shrink-0 transition-all ${col.hasPost ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+                  >
+                    {col.hasPost ? (
+                      // Shows check at rest, X on hover
+                      <div className="relative w-5 h-5">
+                        <Check
+                          size={14}
+                          className="text-indigo-500 group-hover:opacity-0 transition-opacity absolute inset-0 m-auto"
+                        />
+                        <X
+                          size={14}
+                          className="text-red-400 opacity-0 group-hover:opacity-100 transition-opacity absolute inset-0 m-auto"
+                        />
+                      </div>
+                    ) : (
+                      <Plus size={14} className="text-indigo-400" />
+                    )}
+                  </div>
                 </button>
               ))
             ) : (
               <div className="py-6 text-center space-y-1">
-                <p className="text-sm font-semibold text-gray-400">No collections yet</p>
-                <p className="text-xs text-gray-300">Create one above to get started</p>
+                <p className="text-sm font-semibold text-gray-400">
+                  No collections yet
+                </p>
+                <p className="text-xs text-gray-300">
+                  Create one above to get started
+                </p>
               </div>
             )}
           </div>

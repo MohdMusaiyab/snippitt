@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Snippet from "@/app/components/general/Snippitt";
 import Button from "@/app/components/Button";
+import Dropdown from "@/app/components/general/Dropdown";
 import { Category } from "@/app/generated/prisma/enums";
 import {
   ChevronLeft,
@@ -64,8 +65,6 @@ const MyPostComponent = ({ initialData, filters }: MyPostComponentProps) => {
     });
   };
 
-  const categories = Object.values(Category);
-
   return (
     <div
       className={`max-w-7xl mx-auto px-6 py-10 space-y-10 transition-opacity ${isPending ? "opacity-60" : "opacity-100"}`}
@@ -113,43 +112,31 @@ const MyPostComponent = ({ initialData, filters }: MyPostComponentProps) => {
             />
           </div>
           <div className="flex items-center gap-2">
-            <div className="relative flex-1 sm:flex-none">
-              <select
+              <Dropdown
+                options={Object.values(Category).map((cat) => ({
+                  label: cat.replace(/_/g, " "),
+                  value: cat,
+                }))}
                 value={category}
-                onChange={(e) => updateFilters({ category: e.target.value })}
-                className="w-full sm:w-auto pl-3 pr-8 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-600 hover:text-gray-900 appearance-none cursor-pointer outline-none"
-              >
-                <option value="">All Categories</option>
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 hover:text-gray-900">
-                <ChevronRight size={14} className="rotate-90" />
-              </div>
-            </div>
+                onChange={(value) => updateFilters({ category: value })}
+                placeholder="All Categories"
+                allLabel="All Categories"
+              />
 
-            <div className="relative flex-1 sm:flex-none">
-              <select
-                value={sort}
-                onChange={(e) => updateFilters({ sort: e.target.value })}
-                className="w-full sm:w-auto pl-3 pr-8 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-600 hover:text-gray-900 appearance-none cursor-pointer outline-none"
-              >
-                <option value="desc">Sort: Newest</option>
-
-                <option value="asc">Sort: Oldest</option>
-              </select>
-
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 hover:text-gray-900">
-                <ChevronRight size={14} className="rotate-90" />
-              </div>
-            </div>
+              <Dropdown
+              options={[
+                { label: "Newest", value: "desc" },
+                { label: "Oldest", value: "asc" },
+              ]}
+              value={sort}
+              onChange={(value) => updateFilters({ sort: value })}
+              placeholder="Sort"
+              allLabel="Sort"
+              />
           </div>
         </div>
 
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
+        <div className="flex items-center overflow-x-auto no-scrollbar py-1 flex-wrap">
           {["", "PUBLIC", "PRIVATE", "FOLLOWERS", "DRAFT"].map((type) => {
             const isActive = (visibility || "") === type;
             return (

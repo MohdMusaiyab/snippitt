@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Collections } from "@/app/components/collection/Collection";
+import Dropdown from "../general/Dropdown";
 import {
   FolderHeart,
   ChevronLeft,
@@ -75,14 +76,14 @@ const MyCollectionsComponent = ({
           </p>
         </div>
 
-        <Link href="/create-post">
+        <Link href="/collections/new">
           <Button
             variant="primary"
             size="md"
             className="flex items-center gap-2 w-full sm:w-auto whitespace-nowrap rounded-xl shadow-sm shadow-indigo-200"
           >
             <Plus size={18} />
-            <span>New Post</span>
+            <span>New Collection</span>
           </Button>
         </Link>
       </header>
@@ -108,19 +109,16 @@ const MyCollectionsComponent = ({
           </div>
           <div className="flex items-center gap-2">
             <div className="relative flex-1 sm:flex-none">
-              <select
-                value={sort}
-                onChange={(e) => updateFilters({ sort: e.target.value })}
-                className="w-full sm:w-auto pl-3 pr-8 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-600 hover:text-gray-900 appearance-none cursor-pointer outline-none"
-              >
-                <option value="desc">Sort: Newest</option>
-
-                <option value="asc">Sort: Oldest</option>
-              </select>
-
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 hover:text-gray-900">
-                <ChevronRight size={14} className="rotate-90" />
-              </div>
+              <Dropdown
+              options={[
+                { label: "Newest", value: "desc" },
+                { label: "Oldest", value: "asc" },
+              ]}
+              value={sort}
+              onChange={(value) => updateFilters({ sort: value })}
+              placeholder="Sort"
+              allLabel="Sort"
+              />
             </div>
           </div>
         </div>
