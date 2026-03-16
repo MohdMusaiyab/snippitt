@@ -20,13 +20,32 @@ async function getSignedAvatar(url: string | null | undefined) {
   }
 }
 
-export async function getFollowingList(profileId: string) {
+export async function getFollowingList(
+  profileId: string,
+  page: number = 1,
+  limit: number = 10,
+  search: string = "",
+) {
   try {
     const session = await getServerSession(authOptions);
     const currentUserId = session?.user?.id;
+    const skip = (page - 1) * limit;
+
+    const where: any = {
+      followerId: profileId,
+    };
+
+    if (search) {
+      where.following = {
+        username: {
+          contains: search,
+          mode: "insensitive",
+        },
+      };
+    }
 
     const followingData = await prisma.follow.findMany({
-      where: { followerId: profileId },
+      where,
       include: {
         following: {
           select: {
@@ -40,7 +59,6 @@ export async function getFollowingList(profileId: string) {
                 followings: true,
               },
             },
-            // Check if the LOGGED IN user follows these people
             followers: currentUserId
               ? {
                   where: { followerId: currentUserId },
@@ -51,11 +69,16 @@ export async function getFollowingList(profileId: string) {
         },
       },
       orderBy: { createdAt: "desc" },
+      skip,
+      take: limit + 1,
     });
+
+    const hasMore = followingData.length > limit;
+    const records = hasMore ? followingData.slice(0, limit) : followingData;
 
     // 2. Transform data for the UI
     const users = await Promise.all(
-      followingData.map(async (record) => {
+      records.map(async (record) => {
         const user = record.following;
         const signedAvatar = await getSignedAvatar(user.avatar);
 
@@ -66,7 +89,6 @@ export async function getFollowingList(profileId: string) {
           bio: user.bio,
           followerCount: user._count.followers,
           followingCount: user._count.followings,
-          // True if currentUserId is found in the followers array of this user
           isFollowing: currentUserId
             ? (user.followers?.length ?? 0) > 0
             : false,
@@ -75,7 +97,7 @@ export async function getFollowingList(profileId: string) {
       }),
     );
 
-    return { success: true, data: users };
+    return { success: true, data: users, hasMore };
   } catch (error) {
     console.error("getFollowingList Error:", error);
     return { success: false, message: "Failed to load following list" };

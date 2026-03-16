@@ -8,12 +8,17 @@ import { Post } from "@/schemas/post";
 
 interface GetCollectionParams {
   collectionId: string;
+  page?: number;
+  perPage?: number;
 }
 
 export async function getCollectionWithSnippets({
   collectionId,
+  page = 1,
+  perPage = 12,
 }: GetCollectionParams) {
   try {
+    const skip = (page - 1) * perPage;
     const session = await getServerSession(authOptions);
     const currentUserId = session?.user?.id;
 
@@ -24,6 +29,9 @@ export async function getCollectionWithSnippets({
         user: {
           select: { id: true, username: true, avatar: true },
         },
+        _count: {
+          select: { posts: true }
+        }
       },
     });
 
@@ -73,26 +81,33 @@ export async function getCollectionWithSnippets({
           ],
         };
 
-    // 4. Fetch the Snippets
-    const rawPosts = await prisma.post.findMany({
-      where: {
-        collections: { some: { id: collectionId } },
-        ...snippetVisibilityFilter,
-      },
-      include: {
-        user: { select: { id: true, username: true, avatar: true } },
-        images: { where: { isCover: true }, take: 1 },
-        tags: { include: { tag: true } },
-        _count: { select: { likes: true, comments: true, savedBy: true } },
-        likes: currentUserId
-          ? { where: { userId: currentUserId }, select: { userId: true } }
-          : false,
-        savedBy: currentUserId
-          ? { where: { userId: currentUserId }, select: { userId: true } }
-          : false,
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const whereClause = {
+      collections: { some: { id: collectionId } },
+      ...snippetVisibilityFilter,
+    };
+
+    // 4. Fetch the Snippets and Total Count
+    const [rawPosts, totalSnippets] = await Promise.all([
+      prisma.post.findMany({
+        where: whereClause,
+        include: {
+          user: { select: { id: true, username: true, avatar: true } },
+          images: { where: { isCover: true }, take: 1 },
+          tags: { include: { tag: true } },
+          _count: { select: { likes: true, comments: true, savedBy: true } },
+          likes: currentUserId
+            ? { where: { userId: currentUserId }, select: { userId: true } }
+            : false,
+          savedBy: currentUserId
+            ? { where: { userId: currentUserId }, select: { userId: true } }
+            : false,
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: perPage,
+      }),
+      prisma.post.count({ where: whereClause })
+    ]);
 
     // 5. Transform and Sign Cover Image for the Collection
     let signedCollectionCover = collection.coverImage;
@@ -160,11 +175,16 @@ export async function getCollectionWithSnippets({
             ...collection.user,
             avatar: signedOwnerAvatar,
           },
-          _count: { posts: snippets.length },
+          _count: { posts: collection._count.posts },
         },
         snippets,
         isOwner,
         currentUserId: currentUserId || null,
+        pagination: {
+          total: totalSnippets,
+          pages: Math.ceil(totalSnippets / perPage),
+          currentPage: page,
+        }
       },
     };
   } catch (error) {
