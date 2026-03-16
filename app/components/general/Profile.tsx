@@ -5,12 +5,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Grid3X3,
   FolderHeart,
-  Info,
   Calendar,
   Camera,
   Loader2,
   Check,
   X as CloseIcon,
+  MapPin,
+  Users,
+  UserCheck,
+  BarChart2,
 } from "lucide-react";
 import Snippet from "@/app/components/general/Snippitt";
 import { Collections } from "@/app/components/collection/Collection";
@@ -36,12 +39,12 @@ const ProfileClient = ({
   initialCollections,
   currentUserId,
 }: ProfileClientProps) => {
-  // --- UI State ---
-  const [activeTab, setActiveTab] = useState<"posts" | "collections">("posts");
+  const [activeTab, setActiveTab] = useState<"posts" | "collections" | "stats">(
+    "posts",
+  );
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const toggleMenu = (id: string) => setMenuOpen(menuOpen === id ? null : id);
 
-  // --- Edit Mode State ---
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editData, setEditData] = useState({
@@ -50,30 +53,22 @@ const ProfileClient = ({
     avatar: profileData.avatar || "",
   });
 
-  // --- NEW: Temporary avatar state for preview ---
   const [tempAvatarFile, setTempAvatarFile] = useState<File | null>(null);
   const [tempAvatarPreview, setTempAvatarPreview] = useState<string | null>(
     null,
   );
-
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- Avatar Selection Handler (NO UPLOAD YET) ---
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (file.size > 2 * 1024 * 1024) {
-      return toast.error("Avatar image must be less than 2MB");
-    }
-
-    // Create local preview
+    if (file.size > 2 * 1024 * 1024)
+      return toast.error("Avatar must be under 2MB");
     const localUrl = URL.createObjectURL(file);
     setTempAvatarPreview(localUrl);
     setTempAvatarFile(file);
   };
 
-  // --- Clear temp avatar on cancel ---
   const handleCancelEdit = () => {
     setIsEditing(false);
     setEditData({
@@ -81,301 +76,318 @@ const ProfileClient = ({
       bio: profileData.bio || "",
       avatar: profileData.avatar || "",
     });
-    // Clear temp avatar state
-    if (tempAvatarPreview) {
-      URL.revokeObjectURL(tempAvatarPreview);
-    }
+    if (tempAvatarPreview) URL.revokeObjectURL(tempAvatarPreview);
     setTempAvatarFile(null);
     setTempAvatarPreview(null);
   };
 
-  // --- Profile Update Handler (UPLOADS ONLY WHEN SAVING) ---
   const handleSaveProfile = async () => {
     setIsSubmitting(true);
-
-    let avatarUrl = editData.avatar; // Start with current avatar URL
-
+    let avatarUrl = editData.avatar;
     try {
-      // 1. Upload new avatar if one was selected
       if (tempAvatarFile) {
         const toastId = toast.loading("Uploading avatar...");
-
         const result = await generatePresignedUrlAction({
           fileName: tempAvatarFile.name,
           fileType: tempAvatarFile.type,
         });
-
         if (!result.success || !result.data) {
           toast.error(result.message || "Failed to get upload URL", {
             id: toastId,
           });
           throw new Error(result.message);
         }
-
-        const { uploadUrl, fileUrl } = result.data;
-
-        const uploadRes = await fetch(uploadUrl, {
+        const uploadRes = await fetch(result.data.uploadUrl, {
           method: "PUT",
           body: tempAvatarFile,
           headers: { "Content-Type": tempAvatarFile.type },
         });
-
-        if (!uploadRes.ok) throw new Error("S3 Upload failed");
-
-        avatarUrl = fileUrl; // Update avatar URL with the uploaded file URL
+        if (!uploadRes.ok) throw new Error("Upload failed");
+        avatarUrl = result.data.fileUrl;
         toast.success("Avatar uploaded!", { id: toastId });
-
-        // Clean up temp preview
-        if (tempAvatarPreview) {
-          URL.revokeObjectURL(tempAvatarPreview);
-        }
+        if (tempAvatarPreview) URL.revokeObjectURL(tempAvatarPreview);
         setTempAvatarFile(null);
         setTempAvatarPreview(null);
       }
-
-      // 2. Update profile with all changes (including new avatar URL if uploaded)
       const res = await updateUserProfile({
         username: editData.username,
         bio: editData.bio,
-        avatar: avatarUrl, // Use the uploaded URL or existing one
+        avatar: avatarUrl,
       });
-
       if (res.success) {
         toast.success(res.message);
         setIsEditing(false);
-        // Refresh to update Server Side Data and Session
         window.location.reload();
-      } else {
-        toast.error(res.message);
-      }
-    } catch (error) {
+      } else toast.error(res.message);
+    } catch {
       toast.error("An unexpected error occurred");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // --- Clean up object URLs on unmount ---
   React.useEffect(() => {
     return () => {
-      if (tempAvatarPreview) {
-        URL.revokeObjectURL(tempAvatarPreview);
-      }
+      if (tempAvatarPreview) URL.revokeObjectURL(tempAvatarPreview);
     };
   }, [tempAvatarPreview]);
 
+  const avatarSrc = tempAvatarPreview || editData.avatar;
+  const joinDate = new Date(profileData.createdAt).toLocaleDateString(
+    undefined,
+    { month: "long", year: "numeric" },
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      {/* 1. Profile Header */}
-      <div className="bg-white border-b">
-        <div className="max-w-5xl mx-auto px-4 pt-12 pb-8">
-          <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
-            {/* Avatar with Upload Overlay */}
-            <div className="relative group shrink-0">
-              <div className="relative w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-xl bg-gray-100">
-                {/* Show temp preview first, then editData.avatar, then fallback */}
-                {tempAvatarPreview || editData.avatar ? (
-                  <Image
-                    src={tempAvatarPreview || editData.avatar}
-                    alt={profileData.username || "User avatar"}
-                    fill
-                    priority
-                    unoptimized
-                    className="object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-4xl font-bold text-gray-400">
-                    {editData.username[0]?.toUpperCase()}
-                  </div>
-                )}
+    <div className="min-h-screen bg-gray-50">
+      {/* ── Cover banner ──────────────────────────────────────────────── */}
+      <div className="relative h-44 sm:h-56 bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-600 overflow-hidden -m-8">
+        {/* Subtle pattern overlay */}
+        <div
+          className="absolute inset-0 opacity-10"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)",
+            backgroundSize: "40px 40px",
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+      </div>
 
-                {isEditing && (
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="absolute inset-0 z-10 bg-black/40 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                  >
-                    <Camera size={24} />
-                    <span className="text-[10px] font-bold mt-1">UPDATE</span>
-                  </button>
-                )}
-              </div>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleAvatarSelect} // Changed from handleAvatarChange
-                className="hidden"
-                accept="image/*"
-              />
-            </div>
-
-            {/* User Info & Edit Form Logic */}
-            <div className="flex-1 text-center md:text-left w-full">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-                <div className="w-full">
-                  {isEditing ? (
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                        Username
-                      </label>
-                      <input
-                        value={editData.username}
-                        onChange={(e) =>
-                          setEditData({ ...editData, username: e.target.value })
-                        }
-                        className="text-2xl font-bold text-gray-900 border-b-2 border-[#5865F2] outline-none bg-transparent py-1 w-full max-w-md"
-                      />
-                    </div>
+      {/* ── Profile header card ───────────────────────────────────────── */}
+      <div className="max-w-5xl mx-auto px-4 sm:px-6">
+        <div className="relative -mt-16 sm:-mt-20 mb-6">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-5 sm:px-8 pt-6 pb-5">
+            <div className="flex flex-col sm:flex-row sm:items-end gap-5">
+              {/* Avatar */}
+              <div className="relative group -mt-16 sm:-mt-20 flex-shrink-0">
+                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl border-4 border-white shadow-lg overflow-hidden bg-indigo-50 ring-2 ring-indigo-100">
+                  {avatarSrc ? (
+                    <Image
+                      src={avatarSrc}
+                      alt={profileData.username}
+                      fill
+                      className="object-cover"
+                      priority
+                      unoptimized
+                    />
                   ) : (
-                    <h1 className="text-3xl font-extrabold text-gray-900">
-                      @{profileData.username}
-                    </h1>
+                    <div className="w-full h-full flex items-center justify-center text-3xl font-extrabold text-indigo-400">
+                      {editData.username[0]?.toUpperCase()}
+                    </div>
+                  )}
+                  {isEditing && (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity rounded-xl"
+                    >
+                      <Camera size={20} />
+                      <span className="text-[9px] font-bold mt-1 uppercase tracking-wider">
+                        Change
+                      </span>
+                    </button>
                   )}
                 </div>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleAvatarSelect}
+                  className="hidden"
+                  accept="image/*"
+                />
+              </div>
 
-                {/* Actions: Follow or Edit */}
-                <div className="flex items-center gap-2 justify-center shrink-0">
-                  {profileData.isOwner ? (
-                    isEditing ? (
-                      <div className="flex items-center gap-2">
-                        <button
-                          disabled={isSubmitting}
-                          onClick={handleCancelEdit} // Changed from setIsEditing(false)
-                          className="p-2 text-gray-400 hover:bg-gray-100 rounded-full transition"
-                        >
-                          <CloseIcon size={20} />
-                        </button>
-                        <button
-                          disabled={isSubmitting}
-                          onClick={handleSaveProfile}
-                          className="flex items-center gap-2 px-6 py-2 bg-[#5865F2] text-white rounded-full font-bold text-sm shadow-lg shadow-[#5865F2]/20 hover:bg-[#4752C4] transition disabled:opacity-50"
-                        >
-                          {isSubmitting ? (
-                            <Loader2 size={16} className="animate-spin" />
-                          ) : (
-                            <Check size={16} />
-                          )}
-                          Save Profile
-                        </button>
+              {/* Name + actions */}
+              <div className="flex-1 min-w-0 pb-1">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    {isEditing ? (
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                          Username
+                        </label>
+                        <input
+                          value={editData.username}
+                          onChange={(e) =>
+                            setEditData({
+                              ...editData,
+                              username: e.target.value,
+                            })
+                          }
+                          className="text-xl font-extrabold text-gray-900 border-b-2 border-indigo-500 outline-none bg-transparent pb-1 w-full max-w-xs"
+                        />
                       </div>
                     ) : (
-                      <button
-                        onClick={() => setIsEditing(true)}
-                        className="px-8 py-2.5 border border-gray-200 rounded-full font-bold text-sm hover:bg-gray-50 transition-all shadow-sm"
-                      >
-                        Edit Profile
-                      </button>
-                    )
-                  ) : (
-                    <FollowButton
-                      targetUserId={profileData.id}
-                      initialIsFollowing={profileData.isFollowing}
-                      initialFollowerCount={profileData._count.followers}
-                      initialFollowingCount={profileData._count.following}
-                    />
-                  )}
-                </div>
-              </div>
+                      <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 tracking-tight truncate">
+                        @{profileData.username}
+                      </h1>
+                    )}
 
-              {/* Bio Section */}
-              <div className="mt-4">
-                {isEditing ? (
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                      Bio
-                    </label>
-                    <textarea
-                      value={editData.bio}
-                      onChange={(e) =>
-                        setEditData({ ...editData, bio: e.target.value })
-                      }
-                      placeholder="Share a bit about yourself..."
-                      rows={3}
-                      className="w-full max-w-xl p-3 bg-gray-50 rounded-xl border border-gray-200 focus:border-[#5865F2] outline-none transition text-gray-700 text-sm"
-                    />
+                    {!isEditing && (
+                      <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                        <span className="flex items-center gap-1 text-xs text-gray-400">
+                          <Calendar size={11} />
+                          Joined {joinDate}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <p className="text-gray-600 max-w-xl mb-6 text-lg leading-relaxed">
-                    {profileData.bio || "No bio added yet."}
-                  </p>
-                )}
-              </div>
 
-              {!isEditing && (
-                <div className="flex items-center justify-center md:justify-start gap-6 text-xs font-medium text-gray-400">
-                  <div className="flex items-center gap-1.5">
-                    <Calendar size={14} />
-                    Joined{" "}
-                    {new Date(profileData.createdAt).toLocaleDateString(
-                      undefined,
-                      { month: "long", year: "numeric" },
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {profileData.isOwner ? (
+                      isEditing ? (
+                        <>
+                          <button
+                            onClick={handleCancelEdit}
+                            disabled={isSubmitting}
+                            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
+                          >
+                            <CloseIcon size={16} />
+                          </button>
+                          <button
+                            onClick={handleSaveProfile}
+                            disabled={isSubmitting}
+                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-sm shadow-indigo-200 transition-all disabled:opacity-50"
+                          >
+                            {isSubmitting ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <Check size={14} />
+                            )}
+                            {isSubmitting ? "Saving…" : "Save"}
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => setIsEditing(true)}
+                          className="px-4 py-2 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
+                        >
+                          Edit Profile
+                        </button>
+                      )
+                    ) : (
+                      <FollowButton
+                        targetUserId={profileData.id}
+                        initialIsFollowing={profileData.isFollowing}
+                        initialFollowerCount={profileData._count.followers}
+                        initialFollowingCount={profileData._count.following}
+                      />
                     )}
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Bio */}
+            <div className="mt-4">
+              {isEditing ? (
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                    Bio
+                  </label>
+                  <textarea
+                    value={editData.bio}
+                    onChange={(e) =>
+                      setEditData({ ...editData, bio: e.target.value })
+                    }
+                    placeholder="Tell the world about yourself…"
+                    rows={3}
+                    className="w-full max-w-xl px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 focus:bg-white outline-none transition-all text-sm text-gray-700 resize-none"
+                  />
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 leading-relaxed max-w-2xl">
+                  {profileData.bio || (
+                    <span className="text-gray-300 italic">
+                      No bio added yet.
+                    </span>
+                  )}
+                </p>
               )}
             </div>
+
+            {/* Stats strip */}
+            {!isEditing && (
+              <div className="mt-5 pt-4 border-t border-gray-100 flex items-center gap-6 flex-wrap">
+                {[
+                  {
+                    icon: <Grid3X3 size={13} />,
+                    label: "Posts",
+                    value: profileData._count.posts,
+                  },
+                  {
+                    icon: <FolderHeart size={13} />,
+                    label: "Collections",
+                    value: profileData._count.collections,
+                  },
+                  {
+                    icon: <Users size={13} />,
+                    label: "Followers",
+                    value: profileData._count.followers,
+                  },
+                  {
+                    icon: <UserCheck size={13} />,
+                    label: "Following",
+                    value: profileData._count.following,
+                  },
+                ].map(({ icon, label, value }) => (
+                  <div key={label} className="flex items-center gap-1.5">
+                    <span className="text-gray-400">{icon}</span>
+                    <span className="text-sm font-extrabold text-gray-900 tabular-nums">
+                      {value}
+                    </span>
+                    <span className="text-xs text-gray-400">{label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
-      </div>
 
-      {/* Rest of your component remains exactly the same */}
-      <div className="max-w-6xl mx-auto px-4 mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* ... sidebar stats ... */}
-        <aside className="lg:col-span-1 space-y-6">
-          <CategoryChart stats={categoryStats} />
-
-          <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-            <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Info size={18} className="text-[#5865F2]" /> Engagement
-            </h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <div className="text-2xl font-black text-gray-900">
-                  {profileData._count.posts}
-                </div>
-                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-                  Snippets
-                </div>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <div className="text-2xl font-black text-gray-900">
-                  {profileData._count.collections}
-                </div>
-                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-                  Collections
-                </div>
-              </div>
+        {/* ── Main grid ─────────────────────────────────────────────────── */}
+        <div className="flex items-center gap-6 pb-16">
+          {/* Main content */}
+          <main className="w-full space-y-4">
+            {/* Tab bar */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-1.5 flex gap-1">
+              {(
+                [
+                  {
+                    key: "posts",
+                    label: `Posts (${initialPosts.length})`,
+                    icon: <Grid3X3 size={14} />,
+                  },
+                  {
+                    key: "collections",
+                    label: `Collections (${initialCollections.length})`,
+                    icon: <FolderHeart size={14} />,
+                  },
+                ] as const
+              ).map(({ key, label, icon }) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveTab(key)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all
+                    ${activeTab === key ? "bg-primary text-white shadow-sm" : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"}`}
+                >
+                  {icon}
+                  {label}
+                </button>
+              ))}
             </div>
-          </div>
-        </aside>
 
-        {/* Main Content Area */}
-        <main className="lg:col-span-2">
-          {/* ... tabs and content ... */}
-          <div className="flex items-center gap-8 border-b border-gray-200 mb-8 overflow-x-auto no-scrollbar">
-            <TabButton
-              active={activeTab === "posts"}
-              onClick={() => setActiveTab("posts")}
-              icon={<Grid3X3 size={18} />}
-              label="Posts"
-            />
-            <TabButton
-              active={activeTab === "collections"}
-              onClick={() => setActiveTab("collections")}
-              icon={<FolderHeart size={18} />}
-              label="Collections"
-            />
-          </div>
-
-          <div className="min-h-[400px]">
+            {/* Tab content */}
             <AnimatePresence mode="wait">
               {activeTab === "posts" ? (
                 <motion.div
-                  key="posts-tab"
-                  initial={{ opacity: 0, y: 10 }}
+                  key="posts"
+                  initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="space-y-6"
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.15 }}
+                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
                 >
                   {initialPosts.length > 0 ? (
                     initialPosts.map((post) => (
@@ -383,56 +395,59 @@ const ProfileClient = ({
                         key={post.id}
                         post={post}
                         currentUserId={currentUserId as any}
-                        showActions={true}
+                        showActions
                         menuOpen={menuOpen}
                         toggleMenu={toggleMenu}
                       />
                     ))
                   ) : (
-                    <EmptyState message="No snippets published yet." />
+                    <EmptyState
+                      icon={<Grid3X3 size={22} />}
+                      message="No posts published yet."
+                    />
                   )}
                 </motion.div>
               ) : (
                 <motion.div
-                  key="collections-tab"
-                  initial={{ opacity: 0, y: 10 }}
+                  key="collections"
+                  initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.15 }}
                 >
-                  <Collections
-                    collections={initialCollections}
-                    isOwner={profileData.isOwner}
-                    showCoverImage={true}
-                  />
+                  {initialCollections.length > 0 ? (
+                    <Collections
+                      collections={initialCollections}
+                      isOwner={profileData.isOwner}
+                    />
+                  ) : (
+                    <EmptyState
+                      icon={<FolderHeart size={22} />}
+                      message="No collections yet."
+                    />
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
-          </div>
-        </main>
+          </main>
+        </div>
       </div>
     </div>
   );
 };
 
-// --- Sub-components (unchanged) ---
-const TabButton = ({ active, onClick, icon, label }: any) => (
-  <button
-    onClick={onClick}
-    className={`flex items-center gap-2 pb-4 px-2 border-b-2 transition-all whitespace-nowrap font-bold text-sm ${
-      active
-        ? "border-[#5865F2] text-[#5865F2]"
-        : "border-transparent text-gray-400 hover:text-gray-600"
-    }`}
-  >
-    {icon}
-    {label}
-  </button>
-);
-
-const EmptyState = ({ message }: { message: string }) => (
-  <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200">
-    <Info className="w-12 h-12 text-gray-200 mx-auto mb-4" />
-    <p className="text-gray-500 font-medium">{message}</p>
+const EmptyState = ({
+  icon,
+  message,
+}: {
+  icon: React.ReactNode;
+  message: string;
+}) => (
+  <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-16 text-center space-y-3">
+    <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto text-gray-300">
+      {icon}
+    </div>
+    <p className="text-sm font-medium text-gray-400">{message}</p>
   </div>
 );
 

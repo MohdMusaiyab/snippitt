@@ -63,19 +63,6 @@ const FollowButton = ({
       >
         {isFollowing ? "Following" : "Follow"}
       </Button>
-
-      {/* Stats Cluster */}
-      <div className="flex items-center gap-6">
-        <div className="text-center md:text-left">
-          <div className="text-lg font-black text-gray-900 leading-none">{followerCount}</div>
-          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Followers</div>
-        </div>
-        <div className="w-px h-8 bg-gray-100" />
-        <div className="text-center md:text-left">
-          <div className="text-lg font-black text-gray-900 leading-none">{initialFollowingCount}</div>
-          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Following</div>
-        </div>
-      </div>
     </div>
   );
 };
