@@ -10,6 +10,7 @@ import {
   Trash2,
   X,
   ImageIcon,
+  Settings2,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -79,6 +80,8 @@ const EditCollectionClient = ({
   });
   const [localSnippets, setLocalSnippets] = useState(snippets);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
+
+  const [manageMode, setManageMode] = useState(false);
 
   const currVisibility = initialCollection.visibility;
 
@@ -306,87 +309,63 @@ const EditCollectionClient = ({
               </div>
             </div>
 
-            {/* Snippets Section */}
-            <div className="space-y-6">
-              <div className="flex items-center justify-between px-0.5">
-                <h3 className="text-lg font-bold text-gray-900">
-                  Collection Snippets{" "}
-                  <span className="text-indigo-600 ml-1">
-                    ({pagination.total || localSnippets.length})
-                  </span>
-                </h3>
-              </div>
+            <div className="flex items-center justify-between px-0.5">
+              <h3 className="text-lg font-bold text-gray-900">
+                Collection Snippets{" "}
+                <span className="text-indigo-600 ml-1">
+                  ({pagination.total || localSnippets.length})
+                </span>
+              </h3>
+              <button
+                onClick={() => setManageMode((m) => !m)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all
+      ${
+        manageMode
+          ? "bg-red-50 text-red-500 border-red-200 hover:bg-red-100"
+          : "bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200"
+      }`}
+              >
+                {manageMode ? (
+                  <>
+                    <X size={12} /> Done
+                  </>
+                ) : (
+                  <>
+                    <Settings2 size={12} /> Manage
+                  </>
+                )}
+              </button>
+            </div>
 
-              <div className="space-y-6">
-                {localSnippets.map((post: any) => (
-                  <div key={post.id} className="relative group">
-                    <Snippet
-                      post={post}
-                      showActions={true}
-                      menuOpen={menuOpen}
-                      toggleMenu={toggleMenu}
-                      currentUserId={currentUserId}
-                    />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {localSnippets.map((post: any) => (
+                <div
+                  key={post.id}
+                  className={`relative rounded-2xl transition-all ${manageMode ? "ring-2 ring-red-100" : ""}`}
+                >
+                  <Snippet
+                    post={post}
+                    showActions={!manageMode}
+                    menuOpen={menuOpen}
+                    toggleMenu={toggleMenu}
+                    currentUserId={currentUserId}
+                  />
+                  {manageMode && (
                     <button
-                      className="absolute top-3 right-24 p-2 bg-white shadow-md rounded-xl text-red-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 z-20 border border-red-100"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleRemoveSnippet(post.id);
                       }}
-                      title="Remove from collection"
+                      className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-white/80 backdrop-blur-[2px] rounded-2xl border-2 border-red-200 text-red-500 hover:bg-red-50/80 transition-all group"
                     >
-                      <Trash2 size={16} />
+                      <div className="w-10 h-10 rounded-xl bg-red-50 group-hover:bg-red-100 border border-red-200 flex items-center justify-center transition-colors">
+                        <Trash2 size={16} className="text-red-500" />
+                      </div>
+                      <span className="text-xs font-bold">Remove</span>
                     </button>
-                  </div>
-                ))}
-
-                {localSnippets.length === 0 && (
-                  <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200 text-gray-400">
-                    <ImageIcon className="w-10 h-10 mx-auto mb-3 opacity-20" />
-                    <p className="text-sm font-medium">No snippets in this collection yet.</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Pagination */}
-              {pagination.pages > 1 && (
-                <div className="flex items-center justify-between pt-8 border-t border-gray-200">
-                  <p className="text-sm text-gray-500 font-medium">
-                    Page <span className="text-gray-900 font-bold">{pagination.currentPage}</span> of{" "}
-                    <span className="text-gray-900 font-bold">{pagination.pages}</span>
-                  </p>
-
-                  <div className="flex items-center gap-2">
-                    <Button
-                      onClick={() => {
-                        const params = new URLSearchParams(searchParams.toString());
-                        params.set("page", (pagination.currentPage - 1).toString());
-                        router.push(`?${params.toString()}`);
-                      }}
-                      disabled={pagination.currentPage === 1}
-                      variant="outline"
-                      size="sm"
-                      className="rounded-xl px-2"
-                    >
-                      <ChevronLeft size={16} />
-                    </Button>
-
-                    <Button
-                      onClick={() => {
-                        const params = new URLSearchParams(searchParams.toString());
-                        params.set("page", (pagination.currentPage + 1).toString());
-                        router.push(`?${params.toString()}`);
-                      }}
-                      disabled={pagination.currentPage === pagination.pages}
-                      variant="outline"
-                      size="sm"
-                      className="rounded-xl px-2"
-                    >
-                      <ChevronRight size={16} />
-                    </Button>
-                  </div>
+                  )}
                 </div>
-              )}
+              ))}
             </div>
           </div>
 

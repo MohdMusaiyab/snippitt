@@ -150,6 +150,14 @@ const EditPostForm = () => {
   } | null>(null);
   const [previewError, setPreviewError] = useState(false);
 
+  const [pendingConfirm, setPendingConfirm] = useState<{
+    count: number;
+    resolve: (value: boolean) => void;
+  } | null>(null);
+
+  const confirmUpload = (count: number): Promise<boolean> =>
+    new Promise((resolve) => setPendingConfirm({ count, resolve }));
+
   /* ── fetch tags ── */
   useEffect(() => {
     getTags().then((res) => {
@@ -361,8 +369,14 @@ const EditPostForm = () => {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp"],
-      "video/*": [".mp4", ".webm", ".avi", ".mov"],
+      "image/jpeg": [".jpeg", ".jpg"],
+      "image/png": [".png"],
+      "image/gif": [".gif"],
+      "image/webp": [".webp"],
+      "video/mp4": [".mp4"],
+      "video/webm": [".webm"],
+      "video/x-msvideo": [".avi"],
+      "video/quicktime": [".mov"],
     },
     multiple: true,
     maxSize: MAX_SIZE_MB * 1024 * 1024,
@@ -613,12 +627,8 @@ const EditPostForm = () => {
 
     const pending = files.filter((f) => !f.isUploaded);
     if (pending.length) {
-      if (
-        !window.confirm(
-          `${pending.length} file(s) not yet uploaded. Upload now?`,
-        )
-      )
-        return;
+      const confirmed = await confirmUpload(pending.length);
+      if (!confirmed) return;
       if (!(await uploadFiles())) {
         toast.error("Some uploads failed");
         return;
@@ -1222,8 +1232,8 @@ const EditPostForm = () => {
                           from your computer
                         </p>
                         <p className="text-[11px] text-gray-300 mt-3 uppercase tracking-wider font-bold">
-                          Images & videos · up to {MAX_FILES} files ·{" "}
-                          {MAX_SIZE_MB} MB max
+                          JPG · PNG · GIF · WEBP · MP4 · WEBM · AVI · MOV · up
+                          to {MAX_FILES} files · {MAX_SIZE_MB}MB max
                         </p>
                       </div>
 
@@ -1548,6 +1558,57 @@ const EditPostForm = () => {
         onClose={() => setPreviewFile(null)}
         onRetry={() => setPreviewError(false)}
       />
+      {pendingConfirm && (
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-xl max-w-sm w-full mx-auto overflow-hidden">
+            <div className="p-6 space-y-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0">
+                  <AlertCircle size={18} className="text-amber-500" />
+                </div>
+                <div>
+                  <p className="text-base font-extrabold text-gray-900">
+                    Unsaved files
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {pendingConfirm.count} file
+                    {pendingConfirm.count !== 1 ? "s" : ""} not yet uploaded
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+                <p className="text-sm text-amber-700 font-medium">
+                  Would you like to upload {pendingConfirm.count} pending file
+                  {pendingConfirm.count !== 1 ? "s" : ""} before saving?
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => {
+                    pendingConfirm.resolve(false);
+                    setPendingConfirm(null);
+                  }}
+                  variant="outline"
+                  className="flex-1 rounded-xl"
+                >
+                  Cancel
+                </Button>
+                <button
+                  onClick={() => {
+                    pendingConfirm.resolve(true);
+                    setPendingConfirm(null);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-colors"
+                >
+                  <Upload size={13} /> Upload & Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
