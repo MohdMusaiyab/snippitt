@@ -1,5 +1,5 @@
 import { getFollowingList } from "@/actions/user/getFollowing";
-import FollowingClient from "@/app/components/user/FollowingClient";
+import UserListClient from "@/app/components/user/UserListClient";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -7,12 +7,10 @@ import { notFound } from "next/navigation";
 export default async function FollowingPage({
   params,
 }: {
-  params: Promise<{ id: string }>; // 1. Update type to Promise
+  params: Promise<{ id: string }>;
 }) {
-  // 2. Unwrap params before using them
   const { id } = await params;
-
-  const result = await getFollowingList(id);
+  const result = await getFollowingList(id, 1, 10);
 
   if (!result.success || !result.data) {
     return notFound();
@@ -37,7 +35,13 @@ export default async function FollowingPage({
           </p>
         </div>
       </div>
-      <FollowingClient initialUsers={result.data || []} />
+      <UserListClient
+        profileId={id}
+        initialUsers={result.data}
+        initialHasMore={result.hasMore || false}
+        fetchAction={getFollowingList}
+        emptyMessage="Not following anyone yet."
+      />
     </div>
   );
 }

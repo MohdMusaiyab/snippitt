@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Camera,
   Loader2,
@@ -10,12 +10,16 @@ import {
   Trash2,
   X,
   ImageIcon,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import Image from "next/image";
 import { generatePresignedUrlAction } from "@/actions/upload";
 import { updateCollection } from "@/actions/collection/updateCollection";
 import { deleteCollection } from "@/actions/collection/deleteCollection";
+import { removePostFromCollection } from "@/actions/collection";
+import Snippet from "@/app/components/general/Snippitt";
 import Button from "@/app/components/Button";
 import { Visibility } from "@/app/generated/prisma/enums";
 import { DeleteModal } from "../general/DeleteModal";
@@ -50,8 +54,14 @@ const Field = ({
   </div>
 );
 
-const EditCollectionClient = ({ initialCollection }: any) => {
+const EditCollectionClient = ({
+  initialCollection,
+  snippets,
+  currentUserId,
+  pagination = { currentPage: 1, pages: 1, total: 0 },
+}: any) => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -67,7 +77,30 @@ const EditCollectionClient = ({ initialCollection }: any) => {
     visibility: initialCollection.visibility,
     coverImage: initialCollection.coverImage,
   });
+  const [localSnippets, setLocalSnippets] = useState(snippets);
+  const [menuOpen, setMenuOpen] = useState<string | null>(null);
+
   const currVisibility = initialCollection.visibility;
+
+  const toggleMenu = (id: string) => setMenuOpen(menuOpen === id ? null : id);
+
+  const handleRemoveSnippet = async (postId: string) => {
+    const previousSnippets = [...localSnippets];
+    setLocalSnippets(localSnippets.filter((s: any) => s.id !== postId));
+
+    try {
+      const res = await removePostFromCollection(initialCollection.id, postId);
+      if (!res.success) {
+        setLocalSnippets(previousSnippets);
+        toast.error(res.error?.message || "Failed to remove snippet");
+      } else {
+        router.refresh();
+      }
+    } catch {
+      setLocalSnippets(previousSnippets);
+      toast.error("An error occurred while removing");
+    }
+  };
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -271,6 +304,89 @@ const EditCollectionClient = ({ initialCollection }: any) => {
                   />
                 </Field>
               </div>
+            </div>
+
+            {/* Snippets Section */}
+            <div className="space-y-6">
+              <div className="flex items-center justify-between px-0.5">
+                <h3 className="text-lg font-bold text-gray-900">
+                  Collection Snippets{" "}
+                  <span className="text-indigo-600 ml-1">
+                    ({pagination.total || localSnippets.length})
+                  </span>
+                </h3>
+              </div>
+
+              <div className="space-y-6">
+                {localSnippets.map((post: any) => (
+                  <div key={post.id} className="relative group">
+                    <Snippet
+                      post={post}
+                      showActions={true}
+                      menuOpen={menuOpen}
+                      toggleMenu={toggleMenu}
+                      currentUserId={currentUserId}
+                    />
+                    <button
+                      className="absolute top-3 right-24 p-2 bg-white shadow-md rounded-xl text-red-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 z-20 border border-red-100"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveSnippet(post.id);
+                      }}
+                      title="Remove from collection"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+
+                {localSnippets.length === 0 && (
+                  <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200 text-gray-400">
+                    <ImageIcon className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                    <p className="text-sm font-medium">No snippets in this collection yet.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Pagination */}
+              {pagination.pages > 1 && (
+                <div className="flex items-center justify-between pt-8 border-t border-gray-200">
+                  <p className="text-sm text-gray-500 font-medium">
+                    Page <span className="text-gray-900 font-bold">{pagination.currentPage}</span> of{" "}
+                    <span className="text-gray-900 font-bold">{pagination.pages}</span>
+                  </p>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={() => {
+                        const params = new URLSearchParams(searchParams.toString());
+                        params.set("page", (pagination.currentPage - 1).toString());
+                        router.push(`?${params.toString()}`);
+                      }}
+                      disabled={pagination.currentPage === 1}
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl px-2"
+                    >
+                      <ChevronLeft size={16} />
+                    </Button>
+
+                    <Button
+                      onClick={() => {
+                        const params = new URLSearchParams(searchParams.toString());
+                        params.set("page", (pagination.currentPage + 1).toString());
+                        router.push(`?${params.toString()}`);
+                      }}
+                      disabled={pagination.currentPage === pagination.pages}
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl px-2"
+                    >
+                      <ChevronRight size={16} />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

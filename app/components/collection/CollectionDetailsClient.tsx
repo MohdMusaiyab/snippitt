@@ -10,8 +10,11 @@ import {
   Users,
   Calendar,
   ImageIcon,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { format } from "date-fns";
+import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import Snippet from "@/app/components/general/Snippitt";
 import Link from "next/link";
@@ -56,7 +59,10 @@ const CollectionDetailsClient = ({
   snippets,
   currentUserId,
   isOwner,
+  pagination = { currentPage: 1, pages: 1, total: 0 },
 }: any) => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [showActions, setShowAction] = useState(false);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const formattedDate = format(new Date(collection.createdAt), "MMM dd, yyyy");
@@ -196,6 +202,44 @@ const CollectionDetailsClient = ({
               <Plus className="w-4 h-4 mr-1" /> Explore Snippets
             </Button>
             </Link>
+          </div>
+        )}
+        {/* Pagination */}
+        {pagination.pages > 1 && (
+          <div className="flex items-center justify-between pt-8 border-t border-gray-200">
+            <p className="text-sm text-gray-500 font-medium">
+              Page <span className="text-gray-900 font-bold">{pagination.currentPage}</span> of <span className="text-gray-900 font-bold">{pagination.pages}</span>
+            </p>
+
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams.toString());
+                  params.set("page", (pagination.currentPage - 1).toString());
+                  router.push(`?${params.toString()}`);
+                }}
+                disabled={pagination.currentPage === 1}
+                variant="outline"
+                size="sm"
+                className="rounded-xl"
+              >
+                <ChevronLeft size={16} />
+              </Button>
+
+              <Button
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams.toString());
+                  params.set("page", (pagination.currentPage + 1).toString());
+                  router.push(`?${params.toString()}`);
+                }}
+                disabled={pagination.currentPage === pagination.pages}
+                variant="outline"
+                size="sm"
+                className="rounded-xl"
+              >
+                <ChevronRight size={16} />
+              </Button>
+            </div>
           </div>
         )}
       </div>

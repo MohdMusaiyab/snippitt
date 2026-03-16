@@ -1,5 +1,5 @@
 import { getFollowersList } from "@/actions/user/getFollower";
-import FollowersClient from "@/app/components/user/FollowersClient";
+import UserListClient from "@/app/components/user/UserListClient";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -10,9 +10,8 @@ export default async function FollowersPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const result = await getFollowersList(id);
+  const result = await getFollowersList(id, 1, 10);
 
-  // Safety check for TypeScript and data integrity
   if (!result.success || !result.data) {
     return notFound();
   }
@@ -36,7 +35,13 @@ export default async function FollowersPage({
           </p>
         </div>
       </div>
-      <FollowersClient initialUsers={result.data || []} />
+      <UserListClient
+        profileId={id}
+        initialUsers={result.data}
+        initialHasMore={result.hasMore || false}
+        fetchAction={getFollowersList}
+        emptyMessage="No followers found."
+      />
     </div>
   );
 }
