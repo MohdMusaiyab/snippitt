@@ -7,16 +7,17 @@ import {
   GetObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { env } from "./env";
 
 const s3Client = new S3Client({
-  region: process.env.AWS_REGION!,
+  region: env.AWS_REGION,
   credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+    accessKeyId: env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
   },
 });
 
-const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME!;
+const BUCKET_NAME = env.AWS_S3_BUCKET_NAME;
 
 export interface PresignedUrlResponse {
   uploadUrl: string;
@@ -40,7 +41,7 @@ export async function generatePresignedUrl(
   });
 
   const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
-  const fileUrl = `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+  const fileUrl = `https://${BUCKET_NAME}.s3.${env.AWS_REGION}.amazonaws.com/${key}`;
 
   return {
     uploadUrl,
@@ -85,7 +86,7 @@ export async function generatePresignedUrl(
 export async function changeFileVisibility(oldKey: string): Promise<string> {
   // 1. Guard: If it's already an upload key, just return the full URL
   if (oldKey.startsWith("uploads/")) {
-    return `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${oldKey}`;
+    return `https://${BUCKET_NAME}.s3.${env.AWS_REGION}.amazonaws.com/${oldKey}`;
   }
 
   const fileName = oldKey.split("/").pop()!;
@@ -118,7 +119,7 @@ export async function changeFileVisibility(oldKey: string): Promise<string> {
     // 4. Delete from Temp
     await deleteFile(oldKey);
 
-    return `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${newKey}`;
+    return `https://${BUCKET_NAME}.s3.${env.AWS_REGION}.amazonaws.com/${newKey}`;
   } catch (error: any) {
     // 5. Handle Retry Logic: If file is missing from temp, it was likely moved already
     if (error.Code === "NoSuchKey" || error.$metadata?.httpStatusCode === 404) {

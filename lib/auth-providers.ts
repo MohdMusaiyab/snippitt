@@ -6,6 +6,7 @@ import { verifyData } from "./auth";
 import { AuthError } from "@/types/AuthError";
 import { generateUsername } from "./auth";
 import prisma from "./prisma";
+import { env } from "./env";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -105,8 +106,8 @@ export const authOptions: NextAuthOptions = {
       },
     }),
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID as string,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+      clientId: env.GOOGLE_CLIENT_ID,
+      clientSecret: env.GOOGLE_CLIENT_SECRET,
       profile(profile) {
         return {
           id: profile.sub,
@@ -218,5 +219,5 @@ export const authOptions: NextAuthOptions = {
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
 
-  debug: process.env.NODE_ENV === "development",
+  debug: env.NODE_ENV === "development",
 };

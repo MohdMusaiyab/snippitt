@@ -9,18 +9,19 @@ import Button from "@/app/components/Button";
 interface FollowButtonProps {
   targetUserId: string;
   initialIsFollowing: boolean;
-  initialFollowerCount: number;
-  initialFollowingCount: number;
+  initialFollowerCount?: number;
+  initialFollowingCount?: number;
+  onOptimisticUpdate?: (isFollowing: boolean) => void;
+  onRevert?: () => void;
 }
 
 const FollowButton = ({
   targetUserId,
   initialIsFollowing,
-  initialFollowerCount,
-  initialFollowingCount,
+  onOptimisticUpdate,
+  onRevert,
 }: FollowButtonProps) => {
   const [isFollowing, setIsFollowing] = useState(initialIsFollowing);
-  const [followerCount, setFollowerCount] = useState(initialFollowerCount);
   const [isPending, setIsPending] = useState(false);
 
   const handleToggle = async () => {
@@ -28,8 +29,9 @@ const FollowButton = ({
 
     // 1. Optimistic Update (Instant feedback)
     const previousState = isFollowing;
-    setIsFollowing(!previousState);
-    setFollowerCount((prev) => (previousState ? prev - 1 : prev + 1));
+    const newState = !previousState;
+    setIsFollowing(newState);
+    if (onOptimisticUpdate) onOptimisticUpdate(newState);
     setIsPending(true);
 
     try {
@@ -38,13 +40,13 @@ const FollowButton = ({
       if (!result.success) {
         // 2. Rollback on Server Failure
         setIsFollowing(previousState);
-        setFollowerCount(initialFollowerCount);
+        if (onRevert) onRevert();
         toast.error(result.message || "Failed to update follow status");
       }
-    } catch (error) {
+    } catch {
       // 3. Rollback on Network Error
       setIsFollowing(previousState);
-      setFollowerCount(initialFollowerCount);
+      if (onRevert) onRevert();
       toast.error("Network error. Please try again.");
     } finally {
       setIsPending(false);

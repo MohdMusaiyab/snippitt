@@ -2,13 +2,14 @@
 import prisma from "@/lib/prisma";
 import { generateOTP } from "@/lib/auth";
 import nodemailer from "nodemailer";
+import { env } from "@/lib/env";
 
 // Configure nodemailer transporter
 const transporter = nodemailer.createTransport({
   service: "gmail", // Explicitly use Gmail service
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD,
+    user: env.EMAIL_USER,
+    pass: env.EMAIL_PASSWORD
   },
 });
 
@@ -94,9 +95,7 @@ export async function sendVerificationToken(
 
     // Try sending email
     await transporter.sendMail({
-      from: `"Account Verification" <${
-        process.env.EMAIL_FROM || process.env.EMAIL_USER
-      }>`,
+      from: `"Account Verification" <${env.EMAIL_FROM || env.EMAIL_USER}>`,
       to: email,
       subject: "Verify Your Email Address",
       html: `

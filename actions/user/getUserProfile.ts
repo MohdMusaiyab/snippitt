@@ -1,4 +1,3 @@
-"use server";
 
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
@@ -45,7 +44,7 @@ export async function getUserProfile({ profileId }: { profileId: string }) {
             collections: { where: { isDraft: false } },
           },
         },
-        followers: currentUserId
+        followings: currentUserId
           ? {
               where: { followerId: currentUserId },
               select: { followerId: true },
@@ -60,7 +59,7 @@ export async function getUserProfile({ profileId }: { profileId: string }) {
 
     // 2. Content Visibility Logic
     // Section 2: Content Visibility Logic
-    const isFollowing = user.followers && user.followers.length > 0;
+    const isFollowing = user.followings && user.followings.length > 0;
 
     const visibilityFilter = {
       isDraft: false, // STOPS drafts from showing for everyone, including you
@@ -75,7 +74,13 @@ export async function getUserProfile({ profileId }: { profileId: string }) {
     };
 
     // 3. Parallel Data Fetching
-    const [categoryStats, rawPosts, rawCollections] = await Promise.all([
+    const [
+      categoryStats,
+      rawPosts,
+      rawCollections,
+      totalPosts,
+      totalCollections,
+    ] = await Promise.all([
       prisma.post.groupBy({
         by: ["category"],
         where: { userId: profileId, isDraft: false },
@@ -102,6 +107,12 @@ export async function getUserProfile({ profileId }: { profileId: string }) {
         },
         orderBy: { updatedAt: "desc" },
         take: 5,
+      }),
+      prisma.post.count({
+        where: { userId: profileId, ...visibilityFilter },
+      }),
+      prisma.collection.count({
+        where: { userId: profileId, ...visibilityFilter },
       }),
     ]);
 
@@ -158,6 +169,8 @@ export async function getUserProfile({ profileId }: { profileId: string }) {
         categoryStats,
         initialPosts: posts,
         initialCollections: collections,
+        totalPosts,
+        totalCollections,
         currentUserId: currentUserId || null,
       },
     };

@@ -1,5 +1,6 @@
 import { getUserProfile } from "@/actions/user/getUserProfile";
-import ProfileClient from "@/app/components/general/Profile";
+import ProfileHeader from "@/app/components/profile/ProfileHeader";
+import ProfileTabs from "@/app/components/profile/ProfileTabs";
 import { notFound } from "next/navigation";
 
 interface PageProps {
@@ -17,14 +18,26 @@ const Page = async ({ params }: PageProps) => {
     return notFound();
   }
 
+  const { profile, initialPosts, totalPosts, initialCollections, totalCollections, currentUserId } = result.data;
+
   return (
-    <ProfileClient 
-      profileData={result.data.profile}
-      categoryStats={result.data.categoryStats}
-      initialPosts={result.data.initialPosts}
-      initialCollections={result.data.initialCollections}
-      currentUserId={result.data.currentUserId}
-    />
+    <div className="min-h-screen bg-gray-50">
+      <ProfileHeader 
+        profileData={profile} 
+        totalPosts={totalPosts} 
+        totalCollections={totalCollections}
+      >
+        <ProfileTabs
+          initialPosts={initialPosts}
+          totalPosts={totalPosts}
+          initialCollections={initialCollections}
+          totalCollections={totalCollections}
+          profileId={id}
+          currentUserId={currentUserId}
+          isOwner={profile.isOwner}
+        />
+      </ProfileHeader>
+    </div>
   );
 };
 export default Page;
