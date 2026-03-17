@@ -11,6 +11,7 @@ import AddCollectionButton from "./AddCollectionButton";
 import DeleteSnippitButton from "./DeleteSnippitButton";
 import ToggleSaveButton from "./ToggleSaveButton";
 import ShareActionButton from "./ShareActionButton";
+import { env } from "@/lib/env";
 
 const DEFAULT_COVER_IMAGE = "/assets/default.svg";
 
@@ -133,7 +134,7 @@ flex flex-col sm:flex-row gap-4 sm:gap-2 p-2 group"
                     <ShareActionButton
                       id={post.id}
                       title={post.title}
-                      url={`${process.env.NEXT_PUBLIC_APP_URL}/posts/${post.id}`}
+                      url={`${env.NEXT_PUBLIC_APP_URL}/posts/${post.id}`}
                     />
                   )}
                 </div>
@@ -287,7 +288,7 @@ flex flex-col sm:flex-row gap-4 sm:gap-2 p-2 group"
                     <ShareActionButton
                       id={post.id}
                       title={post.title}
-                      url={`${process.env.NEXT_PUBLIC_APP_URL}/posts/${post.id}`}
+                      url={`${env.NEXT_PUBLIC_APP_URL}/posts/${post.id}`}
                     />
                   )}
                 </div>

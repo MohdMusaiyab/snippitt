@@ -30,6 +30,7 @@ import CommentSection from "../comment/CommentSection";
 import AddCollectionButton from "../general/AddCollectionButton";
 import DeleteSnippitButton from "../general/DeleteSnippitButton";
 import ShareActionButton from "../general/ShareActionButton";
+import { env } from "@/lib/env";
 
 /* Visibility badge */
 const VisibilityBadge = ({ visibility }: { visibility: string }) => {
@@ -380,7 +381,7 @@ const PostDetailClient = ({ post, currentUserId }: any) => {
                       <ShareActionButton
                         id={post.id}
                         title={post.title}
-                        url={`${process.env.NEXT_PUBLIC_APP_URL}/posts/${post.id}`}
+                        url={`${env.NEXT_PUBLIC_APP_URL}/posts/${post.id}`}
                       />
                     )}
                   </div>

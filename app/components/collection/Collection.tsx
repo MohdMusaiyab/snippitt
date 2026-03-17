@@ -14,6 +14,7 @@ import {
 import { VisibilityTag } from "../general/VisibilityTags";
 import DeleteCollectionButton from "./DeleteCollectionButton";
 import ShareActionButton from "../general/ShareActionButton";
+import { env } from "@/lib/env";
 
 const DEFAULT_COVER_IMAGE = "/assets/defaultcollectioncover.svg";
 
@@ -146,7 +147,7 @@ export const Collections = ({
                           <ShareActionButton
                             id={collection.id}
                             title={collection.name}
-                            url={`${process.env.NEXT_PUBLIC_APP_URL}/posts/${collection.id}`}
+                            url={`${env.NEXT_PUBLIC_APP_URL}/posts/${collection.id}`}
                           />
                         </div>
                       )}

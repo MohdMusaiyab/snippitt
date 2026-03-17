@@ -21,6 +21,7 @@ import Link from "next/link";
 import DeleteCollectionButton from "./DeleteCollectionButton";
 import ShareActionButton from "../general/ShareActionButton";
 import Button from "../Button";
+import { env } from "@/lib/env";
 
 const VisibilityBadge = ({ visibility }: { visibility: string }) => {
   const map: Record<
@@ -141,7 +142,7 @@ const CollectionDetailsClient = ({
                   <ShareActionButton
                     id={collection.id}
                     title={collection.name}
-                    url={`${process.env.NEXT_PUBLIC_APP_URL}/collections/${collection.id}`}
+                    url={`${env.NEXT_PUBLIC_APP_URL}/collections/${collection.id}`}
                   />
                 </div>
               )}

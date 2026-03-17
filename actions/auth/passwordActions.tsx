@@ -2,13 +2,14 @@
 import prisma from "@/lib/prisma";
 import { generateOTP } from "@/lib/auth";
 import nodemailer from "nodemailer";
+import { env } from "@/lib/env";
 
 // Configure nodemailer transporter
 const transporter = nodemailer.createTransport({
   service: "gmail", // Explicitly use Gmail service
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD,
+    user: env.EMAIL_USER,
+    pass: env.EMAIL_PASSWORD,
   },
 });
 
@@ -84,9 +85,7 @@ await prisma.verificationToken.create({
 
     // Send email
     await transporter.sendMail({
-      from: `"Password Reset" <${
-        process.env.EMAIL_FROM || process.env.EMAIL_USER
-      }>`,
+      from: `"Password Reset" <${env.EMAIL_FROM || env.EMAIL_USER}>`,
       to: email,
       subject: "Reset Your Password",
       html: `

@@ -1,8 +1,9 @@
 import bcrypt from "bcrypt";
 import { authOptions } from "./auth-providers";
 import { getServerSession } from "next-auth";
+import { env } from "./env";
 
-const SALT_ROUNDS = parseInt(process.env.SALT_ROUNDS || "10", 10);
+const SALT_ROUNDS = env.SALT_ROUNDS;
 
 // Hash a password or Security Answer
 export async function hashData(password: string): Promise<string> {
