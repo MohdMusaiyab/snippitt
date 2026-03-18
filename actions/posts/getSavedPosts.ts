@@ -29,9 +29,10 @@ async function getSignedUrl(url: string | null | undefined) {
 }
 
 export async function getSavedPosts(options: any = {}) {
+  const session = await getServerSession(authOptions);
   try {
-    const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
+
       return { success: false, message: "Unauthorized", code: "UNAUTHORIZED" };
     }
 

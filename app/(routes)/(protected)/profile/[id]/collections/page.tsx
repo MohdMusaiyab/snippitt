@@ -1,8 +1,9 @@
 import { getUserCollections } from "@/actions/collection/getUserCollections";
 import ProfileCollectionsClient from "@/app/components/ProfileCollection";
 
-export default async function UserCollectionsPage({ params }: { params: { id: string } }) {
-  const { id } = params;
+export default async function UserCollectionsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+
   
   // Fetch collections for the specific profile ID
   const result = await getUserCollections({ userId: id, page: 1, perPage: 12 });

@@ -92,7 +92,6 @@ const ProfileCollectionsClient = ({
         <Collections 
           collections={filteredCollections}
           variant={viewVariant}
-          showCoverImage={true}
           isOwner={isOwner}
         />
       </motion.div>

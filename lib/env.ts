@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const envSchema = z.object({
+const serverSchema = z.object({
   DATABASE_URL: z.string().url(),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   NEXTAUTH_SECRET: z.string().min(1),
@@ -22,22 +22,50 @@ const envSchema = z.object({
   AWS_SECRET_ACCESS_KEY: z.string().min(1),
   AWS_REGION: z.string().min(1),
   AWS_S3_BUCKET_NAME: z.string().min(1),
-  
+});
+
+const clientSchema = z.object({
   // Public
   NEXT_PUBLIC_APP_URL: z.string().url(),
 });
 
-const _env = envSchema.safeParse(process.env);
+// We must destructure process.env so Webpack can inline the variables effectively on the client side.
+const processEnv = {
+  DATABASE_URL: process.env.DATABASE_URL,
+  NODE_ENV: process.env.NODE_ENV,
+  NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
+  NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+  SALT_ROUNDS: process.env.SALT_ROUNDS,
+  EMAIL_USER: process.env.EMAIL_USER,
+  EMAIL_PASSWORD: process.env.EMAIL_PASSWORD,
+  EMAIL_FROM: process.env.EMAIL_FROM,
+  EMAIL_SECURE: process.env.EMAIL_SECURE,
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+  AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
+  AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
+  AWS_REGION: process.env.AWS_REGION,
+  AWS_S3_BUCKET_NAME: process.env.AWS_S3_BUCKET_NAME,
+  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+};
 
-if (!_env.success) {
+const isServer = typeof window === "undefined";
+
+const parsed = isServer 
+  ? serverSchema.merge(clientSchema).safeParse(processEnv)
+  : clientSchema.safeParse({
+      NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+    });
+
+if (!parsed.success) {
   console.error("❌ Invalid environment variables:");
-  console.error(JSON.stringify(_env.error.format(), null, 2));
+  console.error(JSON.stringify(parsed.error.format(), null, 2));
   
-  // In production, we might want to throw an actual error to stop the build or start
-  // In development, it's nice to see the logs
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV === "production" && isServer) {
     throw new Error("Invalid environment variables. Check the logs above.");
   }
 }
 
-export const env = _env.success ? _env.data : ({} as z.infer<typeof envSchema>);
+export const env = parsed.success 
+  ? (parsed.data as z.infer<typeof serverSchema> & z.infer<typeof clientSchema>) 
+  : (processEnv as unknown as z.infer<typeof serverSchema> & z.infer<typeof clientSchema>);
