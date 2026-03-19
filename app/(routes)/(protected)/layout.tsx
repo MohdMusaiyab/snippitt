@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth-providers";
 import ClientShell from "@/app/components/general/ClientShell";
 
 async function ProtectedContent({ children }: { children: React.ReactNode }) {
+
   const session = await getServerSession(authOptions);
   const userId = session?.user?.id || null;
 

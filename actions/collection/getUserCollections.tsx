@@ -33,9 +33,10 @@ async function getSignedUrl(url: string | null | undefined) {
 }
 
 export async function getUserCollections(options: GetCollectionsOptions = {}) {
+  const session = await getServerSession(authOptions);
   try {
-    const session = await getServerSession(authOptions);
     const currentUserId = session?.user?.id;
+
 
     const targetUserId = options.userId || currentUserId;
 

@@ -34,8 +34,10 @@ export async function getDraftPosts(
     currentUserId: string;
   };
 }> {
+
+  const session = await getServerSession(authOptions);
   try {
-    const session = await getServerSession(authOptions);
+
 
     if (!session?.user?.id) {
       return {

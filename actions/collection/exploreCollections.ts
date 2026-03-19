@@ -24,9 +24,10 @@ export async function getExploreCollections(
   query: string = "",
 ) {
   const PAGE_SIZE = 12; // Collections are bigger, so a smaller batch is better
+  const session = await getServerSession(authOptions);
   try {
-    const session = await getServerSession(authOptions);
     const currentUserId = session?.user?.id;
+
 
     // Visibility Filter Logic
     const visibilityFilter = {

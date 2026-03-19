@@ -30,9 +30,10 @@ async function getSignedUrl(url: string | null | undefined) {
 }
 
 export async function getExplorePosts(options: any = {}) {
+  const session = await getServerSession(authOptions);
   try {
-    const session = await getServerSession(authOptions);
     const userId = session?.user?.id;
+
 
     const page = options.page || 1;
     const perPage = options.perPage || 10;

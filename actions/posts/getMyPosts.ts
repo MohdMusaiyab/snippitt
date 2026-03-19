@@ -18,6 +18,7 @@ interface GetMyPostsOptions {
 }
 
 export async function getMyPosts(options: GetMyPostsOptions = {}): Promise<{
+
   success: boolean;
   message: string;
   code?: string;
@@ -34,8 +35,10 @@ export async function getMyPosts(options: GetMyPostsOptions = {}): Promise<{
     currentUserId: string;
   };
 }> {
+
+  const session = await getServerSession(authOptions);
   try {
-    const session = await getServerSession(authOptions);
+
 
     if (!session?.user?.id) {
       return {
@@ -221,8 +224,9 @@ export async function getMyPosts(options: GetMyPostsOptions = {}): Promise<{
 
 // Optional: Function to get post counts by category
 export async function getMyPostsStats() {
+  const session = await getServerSession(authOptions);
   try {
-    const session = await getServerSession(authOptions);
+
 
     if (!session?.user?.id) {
       return {

@@ -24,10 +24,11 @@ export async function getExploreUsers(
   searchQuery: string = "",
 ) {
   const PAGE_SIZE = 50;
+  const session = await getServerSession(authOptions);
 
   try {
-    const session = await getServerSession(authOptions);
     const currentUserId = session?.user?.id;
+
 
     // 1. Fetch users with optional search and pagination
     const usersData = await prisma.user.findMany({
