@@ -9,13 +9,15 @@ import { motion } from "framer-motion";
 
 interface ProfileCollectionsClientProps {
   initialCollections: any[];
+  totalCollections: number;
   initialPagination: any;
-  isOwner: boolean;
+  currentUserId: string;
   profileId: string;
 }
 
 const ProfileCollectionsClient = ({
   initialCollections,
+  totalCollections,
   isOwner,
   profileId
 }: ProfileCollectionsClientProps) => {

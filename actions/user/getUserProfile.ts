@@ -46,9 +46,9 @@ export async function getUserProfile({ profileId }: { profileId: string }) {
         },
         followings: currentUserId
           ? {
-              where: { followerId: currentUserId },
-              select: { followerId: true },
-            }
+            where: { followerId: currentUserId },
+            select: { followerId: true },
+          }
           : false,
       },
     });
@@ -66,11 +66,11 @@ export async function getUserProfile({ profileId }: { profileId: string }) {
       ...(isOwner
         ? {} // Owners still see their private/followers posts
         : {
-            OR: [
-              { visibility: "PUBLIC" as any },
-              ...(isFollowing ? [{ visibility: "FOLLOWERS" as any }] : []),
-            ],
-          }),
+          OR: [
+            { visibility: "PUBLIC" as any },
+            ...(isFollowing ? [{ visibility: "FOLLOWERS" as any }] : []),
+          ],
+        }),
     };
 
     // 3. Parallel Data Fetching
@@ -97,7 +97,7 @@ export async function getUserProfile({ profileId }: { profileId: string }) {
           savedBy: currentUserId ? { where: { userId: currentUserId } } : false,
         },
         orderBy: { createdAt: "desc" },
-        take: 5,
+        take: 6,
       }),
       prisma.collection.findMany({
         where: { userId: profileId, ...visibilityFilter },
@@ -106,7 +106,7 @@ export async function getUserProfile({ profileId }: { profileId: string }) {
           user: { select: { id: true, username: true, avatar: true } },
         },
         orderBy: { updatedAt: "desc" },
-        take: 5,
+        take: 6,
       }),
       prisma.post.count({
         where: { userId: profileId, ...visibilityFilter },

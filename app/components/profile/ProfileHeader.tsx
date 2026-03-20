@@ -17,6 +17,7 @@ import FollowButton from "@/app/components/general/FollowButton";
 import { updateUserProfile } from "@/actions/user/updateUserProfile";
 import { generatePresignedUrlAction } from "@/actions/upload";
 import { toast } from "sonner";
+import Link from "next/link";
 
 interface ProfileHeaderProps {
   profileData: any;
@@ -33,9 +34,11 @@ export default function ProfileHeader({
 }: ProfileHeaderProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   // Optimistic Follower Count State
-  const [followerCount, setFollowerCount] = useState(profileData._count.followings);
+  const [followerCount, setFollowerCount] = useState(
+    profileData._count.followings,
+  );
 
   const [editData, setEditData] = useState({
     username: profileData.username,
@@ -44,7 +47,9 @@ export default function ProfileHeader({
   });
 
   const [tempAvatarFile, setTempAvatarFile] = useState<File | null>(null);
-  const [tempAvatarPreview, setTempAvatarPreview] = useState<string | null>(null);
+  const [tempAvatarPreview, setTempAvatarPreview] = useState<string | null>(
+    null,
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -80,7 +85,9 @@ export default function ProfileHeader({
           fileType: tempAvatarFile.type,
         });
         if (!result.success || !result.data) {
-          toast.error(result.message || "Failed to get upload URL", { id: toastId });
+          toast.error(result.message || "Failed to get upload URL", {
+            id: toastId,
+          });
           throw new Error(result.message);
         }
         const uploadRes = await fetch(result.data.uploadUrl, {
@@ -119,28 +126,18 @@ export default function ProfileHeader({
   }, [tempAvatarPreview]);
 
   const avatarSrc = tempAvatarPreview || editData.avatar;
-  const joinDate = new Date(profileData.createdAt).toLocaleDateString(undefined, {
-    month: "long",
-    year: "numeric",
-  });
+  const joinDate = new Date(profileData.createdAt).toLocaleDateString(
+    undefined,
+    {
+      month: "long",
+      year: "numeric",
+    },
+  );
 
   return (
     <>
-      <div className="relative h-44 sm:h-56 bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-600 overflow-hidden -m-8">
-        <div
-          className="absolute inset-0 opacity-10"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)",
-            backgroundSize: "40px 40px",
-          }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-      </div>
-
-      <div className="max-w-5xl mx-auto px-4 sm:px-6">
-        <div className="relative -mt-16 sm:-mt-20 mb-6">
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-5 sm:px-8 pt-6 pb-5">
+      <div className="min-h-screen max-w-5xl mx-auto px-4 sm:px-6 py-10">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-5 sm:px-8 pt-6 pb-5 mb-5">
           <div className="flex flex-col sm:flex-row sm:items-end gap-5">
             <div className="relative group -mt-16 sm:-mt-20 flex-shrink-0">
               <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl border-4 border-white shadow-lg overflow-hidden bg-indigo-50 ring-2 ring-indigo-100">
@@ -149,7 +146,7 @@ export default function ProfileHeader({
                     src={avatarSrc}
                     alt={profileData.username}
                     fill
-                    className="object-cover"
+                    className="rounded-2xl object-cover"
                     priority
                     unoptimized
                   />
@@ -252,7 +249,9 @@ export default function ProfileHeader({
                       targetUserId={profileData.id}
                       initialIsFollowing={profileData.isFollowing}
                       onOptimisticUpdate={(isFollowing: boolean) => {
-                        setFollowerCount((prev: number) => isFollowing ? prev + 1 : prev - 1);
+                        setFollowerCount((prev: number) =>
+                          isFollowing ? prev + 1 : prev - 1,
+                        );
                       }}
                       onRevert={() => {
                         setFollowerCount(profileData._count.followings);
@@ -283,7 +282,9 @@ export default function ProfileHeader({
             ) : (
               <p className="text-sm text-gray-500 leading-relaxed max-w-2xl">
                 {profileData.bio || (
-                  <span className="text-gray-300 italic">No bio added yet.</span>
+                  <span className="text-gray-300 italic">
+                    No bio added yet.
+                  </span>
                 )}
               </p>
             )}
@@ -296,37 +297,41 @@ export default function ProfileHeader({
                   icon: <Grid3X3 size={13} />,
                   label: "Posts",
                   value: totalPosts,
+                  href: `/profile/${profileData.id}/posts`,
                 },
                 {
                   icon: <FolderHeart size={13} />,
                   label: "Collections",
                   value: totalCollections,
+                  href: `/profile/${profileData.id}/collections`,
                 },
                 {
                   icon: <Users size={13} />,
                   label: "Followers",
                   value: followerCount,
+                  href: `/profile/${profileData.id}/followers`,
                 },
                 {
                   icon: <UserCheck size={13} />,
                   label: "Following",
                   value: profileData._count.followers,
+                  href: `/profile/${profileData.id}/following`,
                 },
-              ].map(({ icon, label, value }) => (
-                <div key={label} className="flex items-center gap-1.5">
-                  <span className="text-gray-400">{icon}</span>
-                  <span className="text-sm font-extrabold text-gray-900 tabular-nums">
-                    {value}
-                  </span>
-                  <span className="text-xs text-gray-400">{label}</span>
-                </div>
+              ].map(({ icon, label, value, href }) => (
+                <Link key={label} href={href}>
+                  <div key={label} className="flex items-center gap-1.5">
+                    <span className="text-gray-400">{icon}</span>
+                    <span className="text-sm font-extrabold text-gray-900 tabular-nums">
+                      {value}
+                    </span>
+                    <span className="text-xs text-gray-400">{label}</span>
+                  </div>
+                </Link>
               ))}
             </div>
           )}
         </div>
-      </div>
-      
-      {children}
+        {children}
       </div>
     </>
   );

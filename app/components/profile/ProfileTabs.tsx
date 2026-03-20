@@ -28,8 +28,8 @@ export default function ProfileTabs({
   const [activeTab, setActiveTab] = useState<"posts" | "collections">("posts");
 
   return (
-    <div className="flex items-center gap-6 pb-16">
-      <main className="w-full space-y-4">
+    <div className="flex items-center gap-6">
+      <main className="w-full space-y-6">
         {/* Tab bar */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-1.5 flex gap-1">
           {(
@@ -77,6 +77,7 @@ export default function ProfileTabs({
                 totalPosts={totalPosts}
                 profileId={profileId}
                 currentUserId={currentUserId}
+                mode="preview"
               />
             </motion.div>
           ) : (
@@ -92,6 +93,7 @@ export default function ProfileTabs({
                 totalCollections={totalCollections}
                 profileId={profileId}
                 isOwner={isOwner}
+                mode="preview"
               />
             </motion.div>
           )}

@@ -30,7 +30,7 @@ export async function getProfilePosts({ profileId, skip = 0, take = 5 }: { profi
     const user = await prisma.user.findUnique({
       where: { id: profileId },
       select: {
-        followers: currentUserId
+        followings: currentUserId
           ? { where: { followerId: currentUserId }, select: { followerId: true } }
           : false,
       },
@@ -40,18 +40,18 @@ export async function getProfilePosts({ profileId, skip = 0, take = 5 }: { profi
       return { success: false, message: "User not found", data: [] };
     }
 
-    const isFollowing = user.followers && user.followers.length > 0;
+    const isFollowing = user.followings && user.followings.length > 0;
 
     const visibilityFilter = {
       isDraft: false,
       ...(isOwner
         ? {}
         : {
-            OR: [
-              { visibility: "PUBLIC" as any },
-              ...(isFollowing ? [{ visibility: "FOLLOWERS" as any }] : []),
-            ],
-          }),
+          OR: [
+            { visibility: "PUBLIC" as any },
+            ...(isFollowing ? [{ visibility: "FOLLOWERS" as any }] : []),
+          ],
+        }),
     };
 
     const rawPosts = await prisma.post.findMany({

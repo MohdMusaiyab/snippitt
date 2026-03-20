@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
-import { Grid3X3, Loader2 } from "lucide-react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { Grid3X3, ChevronRight, Loader2 } from "lucide-react";
 import Snippet from "@/app/components/general/Snippitt";
 import { getProfilePosts } from "@/actions/user/getProfilePosts";
 
@@ -10,6 +11,7 @@ interface ProfilePostsTabProps {
   totalPosts: number;
   profileId: string;
   currentUserId: string | null;
+  mode?: "preview" | "full";
 }
 
 export default function ProfilePostsTab({
@@ -17,27 +19,65 @@ export default function ProfilePostsTab({
   totalPosts,
   profileId,
   currentUserId,
+  mode = "full",
 }: ProfilePostsTabProps) {
+  const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  const toggleMenu = (id: string) => setMenuOpen(menuOpen === id ? null : id);
   const [posts, setPosts] = useState(initialPosts);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
-  const toggleMenu = (id: string) => setMenuOpen(menuOpen === id ? null : id);
+  const isLoadingRef = useRef(false);
+  const postsLengthRef = useRef(initialPosts.length);
+  const hasMoreRef = useRef(initialPosts.length < totalPosts);
 
-  const loadMore = async () => {
-    if (isLoadingMore) return;
+  const loadMore = useCallback(async () => {
+    if (isLoadingRef.current || !hasMoreRef.current) return;
+    isLoadingRef.current = true;
     setIsLoadingMore(true);
     try {
-      const res = await getProfilePosts({ profileId, skip: posts.length, take: 5 });
-      if (res.success && res.data) {
-        setPosts((prev) => [...prev, ...res.data]);
+      const res = await getProfilePosts({
+        profileId,
+        skip: postsLengthRef.current,
+        take: 9,
+      });
+      if (res.success && res.data && res.data.length > 0) {
+        setPosts((prev) => {
+          const next = [...prev, ...res.data];
+          postsLengthRef.current = next.length;
+          hasMoreRef.current = next.length < totalPosts;
+          return next;
+        });
+      } else {
+        hasMoreRef.current = false;
       }
     } catch (error) {
       console.error("Failed to load more posts", error);
     } finally {
+      isLoadingRef.current = false;
       setIsLoadingMore(false);
     }
-  };
+  }, [profileId, totalPosts]); // stable
+
+  useEffect(() => {
+    if (mode !== "full") return;
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMoreRef.current) {
+          loadMore();
+        }
+      },
+      { threshold: 0.1 },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [mode, loadMore, posts.length]); // posts.length re-attaches sentinel after each page
+
+  const hasMore = posts.length < totalPosts;
 
   if (posts.length === 0) {
     return (
@@ -45,7 +85,9 @@ export default function ProfilePostsTab({
         <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto text-gray-300">
           <Grid3X3 size={22} />
         </div>
-        <p className="text-sm font-medium text-gray-400">No posts published yet.</p>
+        <p className="text-sm font-medium text-gray-400">
+          No posts published yet.
+        </p>
       </div>
     );
   }
@@ -65,16 +107,33 @@ export default function ProfilePostsTab({
         ))}
       </div>
 
-      {posts.length < totalPosts && (
+      {/* Sentinel */}
+      {mode === "full" && (
+        <div ref={sentinelRef} className="flex justify-center">
+          {isLoadingMore && (
+            <Loader2 size={18} className="animate-spin text-gray-300" />
+          )}
+        </div>
+      )}
+
+      {/* Preview mode */}
+      {mode === "preview" && hasMore && (
         <div className="flex justify-center pt-4 pb-8">
-          <button
-            onClick={loadMore}
-            disabled={isLoadingMore}
-            className="flex items-center gap-2 px-6 py-2.5 bg-white border border-gray-200 hover:border-indigo-300 hover:bg-slate-50 text-gray-700 rounded-xl text-sm font-semibold transition-all shadow-sm disabled:opacity-50"
+          <Link
+            href={`/profile/${profileId}/posts`}
+            className="flex items-center gap-2 px-6 py-2.5 text-primary text-sm font-semibold"
           >
-            {isLoadingMore ? <Loader2 size={16} className="animate-spin" /> : null}
-            {isLoadingMore ? "Loading..." : "Load More"}
-          </button>
+            See all posts
+            <ChevronRight size={15} />
+          </Link>
+        </div>
+      )}
+
+      {!hasMore && posts.length > 0 && (
+        <div className="flex justify-center">
+          <p className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">
+            All posts loaded
+          </p>
         </div>
       )}
     </div>
