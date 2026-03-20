@@ -111,13 +111,12 @@ const MyCollectionsComponent = ({
             <div className="relative flex-1 sm:flex-none">
               <Dropdown
               options={[
-                { label: "Newest", value: "desc" },
                 { label: "Oldest", value: "asc" },
               ]}
               value={sort}
               onChange={(value) => updateFilters({ sort: value })}
-              placeholder="Sort"
-              allLabel="Sort"
+              placeholder="Newest"
+              allLabel="Newest"
               />
             </div>
           </div>

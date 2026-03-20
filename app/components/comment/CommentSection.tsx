@@ -28,6 +28,7 @@ export default function CommentSection({ postId, postOwnerId, currentUserId, onC
   }, [postId]);
 
   const handlePostComment = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!inputText.trim() || isSubmitting) return;
     setIsSubmitting(true);
     const res = await createComment(postId, inputText);

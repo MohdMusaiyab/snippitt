@@ -10,6 +10,7 @@ import {
   Folder,
   Edit,
   Ellipsis,
+  Clock,
 } from "lucide-react";
 import { VisibilityTag } from "../general/VisibilityTags";
 import DeleteCollectionButton from "./DeleteCollectionButton";
@@ -159,29 +160,37 @@ export const Collections = ({
               {/* Content */}
               <div className="p-5">
                 {/* User */}
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-8 h-8 rounded-full overflow-hidden bg-primary/20">
-                    {collection.user?.avatar ? (
-                      <Image
-                        src={collection.user.avatar}
-                        alt={collection.user.username}
-                        width={32}
-                        height={32}
-                        className="object-cover"
-                        unoptimized
-                      />
-                    ) : (
-                      <span className="flex items-center justify-center h-full text-sm font-semibold text-gray-700">
-                        {collection.user?.username?.[0]?.toUpperCase()}
-                      </span>
-                    )}
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="relative w-8 h-8 rounded-full overflow-hidden border border-gray-100 bg-gray-50">
+                      {collection.user?.avatar ? (
+                        <Image
+                          src={collection.user.avatar}
+                          alt={collection.user.username}
+                          fill
+                          unoptimized
+                          className="object-cover"
+                        />
+                      ) : (
+                        <span className="bg-indigo-50 w-full h-full flex items-center justify-center text-sm font-bold text-indigo-600">
+                          {collection.user?.username?.[0]?.toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+
+                    <Link
+                      href={`/profile/${collection.user.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <p className="text-sm font-medium text-gray-700 hover:text-indigo-600 transition">
+                        {collection.user.username}
+                      </p>
+                    </Link>
                   </div>
 
-                  <div>
-                    <h4 className="font-semibold text-gray-900">
-                      {collection.user?.username}
-                    </h4>
-                    <p className="text-xs text-gray-500">{timeLabel}</p>
+                  <div className="flex items-center text-[11px] text-gray-400 gap-1">
+                    <Clock size={12} />
+                    {timeLabel}
                   </div>
                 </div>
 

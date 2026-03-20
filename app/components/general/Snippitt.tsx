@@ -299,7 +299,7 @@ flex flex-col sm:flex-row gap-4 sm:gap-2 p-2 group"
       </div>
 
       {/* Content */}
-      <div className="p-5 flex flex-col h-full bg-white rounded-b-2xl">
+      <div className="p-5 flex flex-col flex-1 bg-white rounded-b-2xl">
         <div className="flex justify-between items-start mb-3">
           <div className="flex items-center gap-2">
             <Link
@@ -350,46 +350,60 @@ flex flex-col sm:flex-row gap-4 sm:gap-2 p-2 group"
           {post.description}
         </p>
 
-        {/* 3. Footer Section */}
+        <div className="min-h-[28px] flex flex-wrap gap-2 mb-4">
+          {post.tags.slice(0, 2).map((tag) => (
+            <Link
+              key={tag}
+              href={{
+                pathname: post.isDraft
+                  ? `/posts/${post.id}/edit`
+                  : "/explore/posts",
+                query: post.isDraft ? "" : { tag },
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 px-2 py-0.5 rounded-md flex items-center gap-0.5"
+            >
+              #{tag}
+            </Link>
+          ))}
+          {post.tags.length > 2 && (
+            <span className="px-2 py-1 text-xs text-gray-400">
+              +{post.tags.length - 2} more
+            </span>
+          )}
+        </div>
+
         <div className="mt-auto pt-4 border-t border-gray-50 flex items-center justify-between">
           <div
-            className="flex items-center justify-between text-xs text-gray-500"
+            className="flex items-center gap-2 text-xs text-gray-500"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-2">
-              {/* Like */}
-              <LikeButton
-                postId={post.id}
-                initialIsLiked={post.isLiked}
-                initialLikeCount={post._count.likes}
-              />
-
-              {/* Link to Comments */}
-              <Link
-                href={`/posts/${post.id}#comments`}
-                onClick={(e) => e.stopPropagation()}
-                className="flex items-center"
-              >
-                <div className="p-1 cursor-pointer flex items-center justify-center transition active:scale-90 focus:outline-none">
-                  <MessageCircle
-                    size={18}
-                    strokeWidth={2}
-                    className="stroke-gray-500 hover:stroke-primary transition"
-                  />
-                </div>
-
-                <span className="text-xs tabular-nums text-gray-500">
-                  {post._count.comments}
-                </span>
-              </Link>
-
-              {/* Saved */}
-              <ToggleSaveButton
-                postId={post.id}
-                initialIsSaved={post.isSaved}
-                initialSaveCount={post._count.savedBy}
-              />
-            </div>
+            <LikeButton
+              postId={post.id}
+              initialIsLiked={post.isLiked}
+              initialLikeCount={post._count.likes}
+            />
+            <Link
+              href={`/posts/${post.id}#comments`}
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center"
+            >
+              <div className="p-1 cursor-pointer flex items-center justify-center transition active:scale-90 focus:outline-none">
+                <MessageCircle
+                  size={18}
+                  strokeWidth={2}
+                  className="stroke-gray-500 hover:stroke-primary transition"
+                />
+              </div>
+              <span className="text-xs tabular-nums text-gray-500">
+                {post._count.comments}
+              </span>
+            </Link>
+            <ToggleSaveButton
+              postId={post.id}
+              initialIsSaved={post.isSaved}
+              initialSaveCount={post._count.savedBy}
+            />
           </div>
           {post.isDraft ? (
             <div className="flex items-center gap-1 bg-yellow-50 text-yellow-600 text-xs px-2 py-1 rounded-full font-medium">
@@ -400,35 +414,6 @@ flex flex-col sm:flex-row gap-4 sm:gap-2 p-2 group"
             <VisibilityTag visibility={post.visibility} />
           )}
         </div>
-
-        {/* Tags */}
-        {post.tags && post.tags.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {post.tags.slice(0, 2).map((tag) => (
-              <Link
-                key={tag}
-                href={{
-                  pathname: post.isDraft
-                    ? `/posts/${post.id}/edit`
-                    : "/explore/posts",
-                  query: post.isDraft
-                    ? ""
-                    : {tag},
-                }}
-                onClick={(e) => e.stopPropagation()}
-                className="text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 px-2 py-0.5 rounded-md flex items-center gap-0.5"
-              >
-                #{tag}
-              </Link>
-            ))}
-
-            {post.tags.length > 2 && (
-              <span className="px-2 py-1 text-xs text-gray-400">
-                +{post.tags.length - 2} more
-              </span>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

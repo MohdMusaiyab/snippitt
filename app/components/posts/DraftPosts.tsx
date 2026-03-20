@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import Snippet from "@/app/components/general/Snippitt";
+import Dropdown from "../general/Dropdown";
 import Button from "@/app/components/Button";
 import { Category } from "@/app/generated/prisma/enums";
 
@@ -74,7 +75,8 @@ const DraftPosts = ({ initialData, filters }: DraftPostsProps) => {
             Drafts
           </h1>
           <p className="text-sm text-gray-500">
-            Your drafts are published as private posts. You can make changes and publish them anytime or keep them as drafts.
+            Your drafts are published as private posts. You can make changes and
+            publish them anytime or keep them as drafts.
           </p>
         </div>
 
@@ -110,43 +112,27 @@ const DraftPosts = ({ initialData, filters }: DraftPostsProps) => {
             />
           </div>
           <div className="flex items-center gap-2">
-            <div className="relative flex-1 sm:flex-none">
-              <select
-                value={category}
-                onChange={(e) => updateFilters({ category: e.target.value })}
-                className="w-full sm:w-auto pl-3 pr-8 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-600 hover:text-gray-900 appearance-none cursor-pointer outline-none"
-              >
-                <option value="">All Categories</option>
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 hover:text-gray-900">
-                <ChevronRight size={14} className="rotate-90" />
-              </div>
-            </div>
-
-            <div className="relative flex-1 sm:flex-none">
-              <select
-                value={sort}
-                onChange={(e) => updateFilters({ sort: e.target.value })}
-                className="w-full sm:w-auto pl-3 pr-8 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-600 hover:text-gray-900 appearance-none cursor-pointer outline-none"
-              >
-                <option value="desc">Sort: Newest</option>
-
-                <option value="asc">Sort: Oldest</option>
-              </select>
-
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 hover:text-gray-900">
-                <ChevronRight size={14} className="rotate-90" />
-              </div>
-            </div>
+            <Dropdown
+              options={Object.values(Category).map((cat) => ({
+                label: cat.replace(/_/g, " "),
+                value: cat,
+              }))}
+              value={category}
+              onChange={(value) => updateFilters({ category: value })}
+              placeholder="All Categories"
+              allLabel="All Categories"
+            />
+            <Dropdown
+              options={[{ label: "Oldest", value: "asc" }]}
+              value={sort}
+              onChange={(value) => updateFilters({ sort: value })}
+              placeholder="Newest"
+              allLabel="Newest"
+            />
           </div>
         </div>
       </div>
-      
+
       {/* 3. Content Rendering */}
       {posts.length === 0 ? (
         <div className="bg-white rounded-2xl border border-dashed border-primary/50 p-12 text-center">
