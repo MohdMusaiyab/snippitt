@@ -5,13 +5,13 @@ import { useRouter } from "next/navigation";
 import { createCollection } from "@/actions/collection";
 import { generatePresignedUrlAction } from "@/actions/upload";
 import { toast } from "sonner";
-import { 
-  FolderPlus, 
-  ArrowLeft, 
-  Loader2, 
-  Sparkles, 
-  Globe, 
-  Lock, 
+import {
+  FolderPlus,
+  ArrowLeft,
+  Loader2,
+  Sparkles,
+  Globe,
+  Lock,
   Users,
   Camera,
 } from "lucide-react";
@@ -94,7 +94,8 @@ export default function NewCollectionPage() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) return toast.error("Image must be less than 5MB");
+    if (file.size > 5 * 1024 * 1024)
+      return toast.error("Image must be less than 5MB");
 
     setSelectedFile(file);
     const objectUrl = URL.createObjectURL(file);
@@ -104,7 +105,8 @@ export default function NewCollectionPage() {
   const handleCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) return toast.error("Image must be less than 5MB");
+    if (file.size > 5 * 1024 * 1024)
+      return toast.error("Image must be less than 5MB");
 
     setSelectedFile(file);
     const reader = new FileReader();
@@ -169,12 +171,12 @@ export default function NewCollectionPage() {
             href="/my-collections"
             className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-indigo-600 transition-colors mb-6 group"
           >
-          <ArrowLeft
-            size={15}
-            className="group-hover:-translate-x-0.5 transition-transform"
-          />
-          Back to Collections
-        </Link>
+            <ArrowLeft
+              size={15}
+              className="group-hover:-translate-x-0.5 transition-transform"
+            />
+            Back to Collections
+          </Link>
 
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
             <div className="space-y-1">
@@ -199,7 +201,9 @@ export default function NewCollectionPage() {
             <div className="p-6 sm:p-8 space-y-8">
               {/* Cover Image */}
               <div className="space-y-3">
-                <label className="text-sm font-semibold text-gray-900">Cover Image</label>
+                <label className="text-sm font-semibold text-gray-900">
+                  Cover Image
+                </label>
                 <div
                   className="relative h-48 w-full rounded-2xl overflow-hidden bg-gray-50 border-2 border-dashed border-gray-200 group cursor-pointer transition-all hover:border-indigo-400 hover:bg-indigo-50/10"
                   onClick={() => fileInputRef.current?.click()}
@@ -231,7 +235,7 @@ export default function NewCollectionPage() {
                     </div>
                   )}
                 </div>
-                
+
                 {isMobile && !previewUrl && (
                   <button
                     type="button"
@@ -271,16 +275,15 @@ export default function NewCollectionPage() {
                     type="text"
                     value={formData.name}
                     onChange={(e) => {
-                      setFormData({ ...formData, name: e.target.value.slice(0, 40) });
+                      setFormData({
+                        ...formData,
+                        name: e.target.value.slice(0, 40),
+                      });
                       if (errors.name) setErrors({ name: "" });
                     }}
-                    placeholder="e.g. Awesome React Hooks"
+                    placeholder="e.g. Awesome Design Ideas"
                     className={inputClass(!!errors.name)}
                     autoFocus
-                  />
-                  <Sparkles
-                    size={16}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-indigo-400 opacity-0 group-focus-within:opacity-100 transition-opacity"
                   />
                 </div>
               </Field>
@@ -300,23 +303,39 @@ export default function NewCollectionPage() {
                   }
                   rows={3}
                   placeholder="What's this collection about?"
-                  className={`${inputBase} resize-none`}
+                  className={`${inputClass(false)} resize-none`}
                 />
               </Field>
 
               {/* Visibility */}
               <div className="space-y-3">
-                <label className="text-sm font-semibold text-gray-900">Visibility</label>
+                <label className="text-sm font-semibold text-gray-900">
+                  Visibility
+                </label>
                 <div className="flex p-1 bg-gray-50 rounded-xl border border-gray-100 max-w-sm">
                   {[
-                    { id: Visibility.PUBLIC, icon: <Globe size={14} />, label: "Public" },
-                    { id: Visibility.FOLLOWERS, icon: <Users size={14} />, label: "Followers" },
-                    { id: Visibility.PRIVATE, icon: <Lock size={14} />, label: "Private" },
+                    {
+                      id: Visibility.PUBLIC,
+                      icon: <Globe size={14} />,
+                      label: "Public",
+                    },
+                    {
+                      id: Visibility.FOLLOWERS,
+                      icon: <Users size={14} />,
+                      label: "Followers",
+                    },
+                    {
+                      id: Visibility.PRIVATE,
+                      icon: <Lock size={14} />,
+                      label: "Private",
+                    },
                   ].map((v) => (
                     <button
                       key={v.id}
                       type="button"
-                      onClick={() => setFormData({ ...formData, visibility: v.id })}
+                      onClick={() =>
+                        setFormData({ ...formData, visibility: v.id })
+                      }
                       className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-all ${
                         formData.visibility === v.id
                           ? "bg-white text-indigo-600 shadow-sm border border-indigo-100"
@@ -334,9 +353,10 @@ export default function NewCollectionPage() {
             {/* Footer */}
             <div className="px-6 sm:px-8 py-6 bg-gray-50/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <p className="text-xs text-gray-400 max-w-sm">
-                Collections allow you to group related snippets together. You can always change these settings later.
+                Collections allow you to group related snippets together. You
+                can always change these settings later.
               </p>
-              
+
               <Button
                 type="submit"
                 variant="primary"

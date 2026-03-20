@@ -192,24 +192,39 @@ const CollectionDetailsClient = ({
             ))}
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center">
-            <ImageIcon className="w-10 h-10 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold">This collection is empty</h3>
-            <p className="text-gray-600 mb-6">
-              Start exploring and add some snippets to this collection.
-            </p>
-            <Link href={`/explore/posts`} >       
-            <Button variant="primary" size="md">
-              <Plus className="w-4 h-4 mr-1" /> Explore Snippets
-            </Button>
-            </Link>
+          <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-16 text-center space-y-3">
+            <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto">
+              <ImageIcon size={22} className="text-gray-300" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-gray-700">No snippets yet</p>
+              {isOwner && (
+                <>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Start exploring and add some snippets to this collection.
+                  </p>
+                  <Link href="/explore/posts" className="inline-block mt-4">
+                    <Button variant="primary" size="md">
+                      <Plus className="w-4 h-4 mr-1" /> Explore Snippets
+                    </Button>
+                  </Link>
+                </>
+              )}
+            </div>
           </div>
         )}
         {/* Pagination */}
         {pagination.pages > 1 && (
           <div className="flex items-center justify-between pt-8 border-t border-gray-200">
             <p className="text-sm text-gray-500 font-medium">
-              Page <span className="text-gray-900 font-bold">{pagination.currentPage}</span> of <span className="text-gray-900 font-bold">{pagination.pages}</span>
+              Page{" "}
+              <span className="text-gray-900 font-bold">
+                {pagination.currentPage}
+              </span>{" "}
+              of{" "}
+              <span className="text-gray-900 font-bold">
+                {pagination.pages}
+              </span>
             </p>
 
             <div className="flex items-center gap-2">
