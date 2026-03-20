@@ -44,25 +44,22 @@ export async function getExplorePosts(options: any = {}) {
     const visibilityFilter = {
       OR: [
         { visibility: "PUBLIC" as any },
-        ...(userId ? [{ userId: userId }] : []),
-        {
-          AND: [
-            { visibility: "FOLLOWERS" as any },
-            ...(userId
-              ? [
-                  {
-                    user: {
-                      followers: {
-                        some: {
-                          followerId: userId,
-                        },
-                      },
-                    },
+        // exclude private posts from expore page 
+        // Only show followers-only posts if the viewer follows the author
+        ...(userId
+          ? [{
+            AND: [
+              { visibility: "FOLLOWERS" as any },
+              {
+                user: {
+                  followers: {
+                    some: { followerId: userId },
                   },
-                ]
-              : [{ id: "not-possible-id" }]), // If no user, they can't see followers-only posts
-          ],
-        },
+                },
+              },
+            ],
+          }]
+          : []),
       ],
     };
 
