@@ -67,7 +67,7 @@ const Sidebar = ({ activeTab, setActiveTab, userId }: SidebarProps) => {
       href: "/my-posts",
     },
     {
-      label: "Collections",
+      label: "My Collections",
       tab: "my-collections" as ActiveTab,
       icon: <BookOpen size={20} />,
       href: "/my-collections",
@@ -199,7 +199,7 @@ const Sidebar = ({ activeTab, setActiveTab, userId }: SidebarProps) => {
         </Link>
       </div>
 
-      <nav className="flex-1 px-3 space-y-1 overflow-y-auto custom-scrollbar">
+      <nav className="flex-1 px-3 space-y-1 pb-8 overflow-y-auto custom-scrollbar">
         {navItems.map((item) => (
           <div key={item.tab}>
             {item.tab === "explore" ? (

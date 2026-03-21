@@ -58,9 +58,10 @@ const FollowButton = ({
       {/* Action Button */}
       <Button
         variant={isFollowing ? "outline" : "primary"}
+        size="sm"
         onClick={handleToggle}
         disabled={isPending}
-        className={`min-w-[130px] shadow-sm ${isFollowing ? "bg-white border-gray-200 text-gray-600 hover:text-red-500 hover:border-red-100 hover:bg-red-50 transition-all" : ""}`}
+        className={`shadow-sm ${isFollowing ? "bg-white border-gray-200 text-gray-600 hover:text-red-500 hover:border-red-100 hover:bg-red-50 transition-all" : ""}`}
         icon={isPending ? <Loader2 className="animate-spin" size={18} /> : isFollowing ? <UserCheck size={18} /> : <UserPlus size={18} />}
       >
         {isFollowing ? "Following" : "Follow"}
