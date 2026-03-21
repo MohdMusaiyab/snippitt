@@ -44,7 +44,7 @@ export async function getUserProfile({ profileId }: { profileId: string }) {
             collections: { where: { isDraft: false } },
           },
         },
-        followings: currentUserId
+        followers: currentUserId
           ? {
             where: { followerId: currentUserId },
             select: { followerId: true },
@@ -59,7 +59,7 @@ export async function getUserProfile({ profileId }: { profileId: string }) {
 
     // 2. Content Visibility Logic
     // Section 2: Content Visibility Logic
-    const isFollowing = user.followings && user.followings.length > 0;
+    const isFollowing = user.followers && user.followers.length > 0;
 
     const visibilityFilter = {
       isDraft: false, // STOPS drafts from showing for everyone, including you

@@ -37,7 +37,7 @@ export default function ProfileHeader({
 
   // Optimistic Follower Count State
   const [followerCount, setFollowerCount] = useState(
-    profileData._count.followings,
+    profileData._count.followers,
   );
 
   const [editData, setEditData] = useState({
@@ -254,7 +254,7 @@ export default function ProfileHeader({
                         );
                       }}
                       onRevert={() => {
-                        setFollowerCount(profileData._count.followings);
+                        setFollowerCount(profileData._count.followers);
                       }}
                     />
                   )}
@@ -314,7 +314,7 @@ export default function ProfileHeader({
                 {
                   icon: <UserCheck size={13} />,
                   label: "Following",
-                  value: profileData._count.followers,
+                  value: profileData._count.followings,
                   href: `/profile/${profileData.id}/following`,
                 },
               ].map(({ icon, label, value, href }) => (

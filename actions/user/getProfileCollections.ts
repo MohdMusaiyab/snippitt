@@ -30,7 +30,7 @@ export async function getProfileCollections({ profileId, skip = 0, take = 5 }: {
     const user = await prisma.user.findUnique({
       where: { id: profileId },
       select: {
-        followings: currentUserId
+        followers: currentUserId
           ? { where: { followerId: currentUserId }, select: { followerId: true } }
           : false,
       },
@@ -40,7 +40,7 @@ export async function getProfileCollections({ profileId, skip = 0, take = 5 }: {
       return { success: false, message: "User not found", data: [] };
     }
 
-    const isFollowing = user.followings && user.followings.length > 0;
+    const isFollowing = user.followers && user.followers.length > 0;
 
     const visibilityFilter = {
       isDraft: false,

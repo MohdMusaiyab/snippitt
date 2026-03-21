@@ -27,8 +27,8 @@ model User {
   updatedAt          DateTime            @updatedAt
   collections        Collection[]
   comments           Comment[]
-  followers          Follow[]            @relation("Follower")
-  followings         Follow[]            @relation("Following")
+  followers          Follow[]            @relation("Following") // where user is being followed
+  followings         Follow[]            @relation("Follower") // where user is the follower
   highlightedPosts   HighlightedPost[]   @relation("HighlightedPosts")
   likes              Like[]
   posts              Post[]
