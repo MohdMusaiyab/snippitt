@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef } from "react";
+import { signOut } from "next-auth/react";
 import Image from "next/image";
 import {
   Grid3X3,
@@ -12,6 +13,7 @@ import {
   X as CloseIcon,
   Users,
   UserCheck,
+  LogOutIcon,
 } from "lucide-react";
 import FollowButton from "@/app/components/general/FollowButton";
 import { updateUserProfile } from "@/actions/user/updateUserProfile";
@@ -159,7 +161,7 @@ export default function ProfileHeader({
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity rounded-xl"
+                    className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white opacity-100 transition-opacity rounded-xl"
                   >
                     <Camera size={20} />
                     <span className="text-[9px] font-bold mt-1 uppercase tracking-wider">
@@ -214,36 +216,47 @@ export default function ProfileHeader({
 
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {profileData.isOwner ? (
-                    isEditing ? (
-                      <>
+                    <>
+                      {isEditing ? (
+                        <>
+                          <button
+                            onClick={handleCancelEdit}
+                            disabled={isSubmitting}
+                            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
+                          >
+                            <CloseIcon size={16} />
+                          </button>
+                          <button
+                            onClick={handleSaveProfile}
+                            disabled={isSubmitting}
+                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-sm shadow-indigo-200 transition-all disabled:opacity-50"
+                          >
+                            {isSubmitting ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <Check size={14} />
+                            )}
+                            {isSubmitting ? "Saving…" : "Save"}
+                          </button>
+                        </>
+                      ) : (
                         <button
-                          onClick={handleCancelEdit}
-                          disabled={isSubmitting}
-                          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
+                          onClick={() => setIsEditing(true)}
+                          className="px-4 py-2 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
                         >
-                          <CloseIcon size={16} />
+                          Edit Profile
                         </button>
-                        <button
-                          onClick={handleSaveProfile}
-                          disabled={isSubmitting}
-                          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-sm shadow-indigo-200 transition-all disabled:opacity-50"
-                        >
-                          {isSubmitting ? (
-                            <Loader2 size={14} className="animate-spin" />
-                          ) : (
-                            <Check size={14} />
-                          )}
-                          {isSubmitting ? "Saving…" : "Save"}
-                        </button>
-                      </>
-                    ) : (
+                      )}
+
                       <button
-                        onClick={() => setIsEditing(true)}
-                        className="px-4 py-2 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
+                        onClick={() =>
+                          signOut({ callbackUrl: "/auth/sign-in" })
+                        }
+                        className=""
                       >
-                        Edit Profile
+                        <LogOutIcon size={20} className="text-red-500"/>
                       </button>
-                    )
+                    </>
                   ) : (
                     <FollowButton
                       targetUserId={profileData.id}

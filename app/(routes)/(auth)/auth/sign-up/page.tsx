@@ -21,7 +21,8 @@ import PasswordInput from "@/app/components/inputFields/PasswordInput";
 import PhoneNumberInput from "@/app/components/inputFields/PhoneNumberInput";
 import Button from "@/app/components/Button";
 import api from "@/lib/api";
-import Logo from "@/assets/Snippit-logo-v2.svg";
+
+const Logo = "/assets/Snippit-logo-v2.svg";
 
 const SignupPage: React.FC = () => {
   const router = useRouter();
@@ -136,6 +137,7 @@ const SignupPage: React.FC = () => {
             width={140}
             height={40}
             className="mx-auto h-10 sm:h-12"
+            unoptimized
           />
         </div>
 

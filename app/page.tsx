@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -10,355 +10,686 @@ import {
   BookOpen,
   Share2,
   Tag,
-  ChevronDown,
+  Mic,
+  Globe,
+  Film,
+  Bookmark,
+  Heart,
+  Layers,
+  Users,
+  Lock,
+  Zap,
+  ChevronRight,
+  Star,
 } from "lucide-react";
 
-import Logo from "@/assets/logo-colored.png";
-import Button from "./components/Button";
+const Logo = "/assets/Snippit-logo-v2.svg";
+const PostImg = "/assets/screenshots/post.png";
+const CollectionImg = "/assets/screenshots/collection.png";
+const ProfileImg = "/assets/screenshots/profile.png";
+const ExploreImg = "/assets/screenshots/explore.png";
 
-interface FeatureCardProps {
-  icon: React.ElementType;
-  title: string;
-  description: string;
-  delay?: number;
+/* useInView */
+function useInView(threshold = 0.15) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) {
+          setInView(true);
+          obs.disconnect();
+        }
+      },
+      { threshold },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [threshold]);
+  return { ref, inView };
 }
 
-const FeatureCard: React.FC<FeatureCardProps> = ({
-  icon: Icon,
-  title,
-  description,
-  delay = 0,
-}) => (
-  <div
-    className="group relative bg-gray-800/40 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-8 hover:bg-gray-800/60 transition-all duration-500 hover:scale-105 hover:shadow-2xl"
-    style={{ animationDelay: `${delay}ms` }}
-  >
-    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-    <div className="relative z-10">
-      <div className="w-12 h-12 bg-gradient-to-bl from-pastel-blue to-accent-blue rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-        <Icon className="w-7 h-7" />
-      </div>
-      <h3 className="text-xl font-bold text-white mb-4 group-hover:text-blue-300 transition-colors">
-        {title}
-      </h3>
-      <p className="text-gray-400 leading-relaxed">{description}</p>
-    </div>
-  </div>
-);
-
-
-
-interface FloatingElementProps {
-  children: React.ReactNode;
-  delay?: number;
-  direction?: "up" | "down";
-}
-
-const FloatingElement: React.FC<FloatingElementProps> = ({
+/* Reveal */
+function Reveal({
   children,
   delay = 0,
-  direction = "up",
-}) => {
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setIsVisible(true), delay);
-    return () => clearTimeout(timer);
-  }, [delay]);
-
+  className = "",
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  className?: string;
+}) {
+  const { ref, inView } = useInView();
   return (
     <div
-      className={`transform transition-all duration-1000 ${
-        isVisible
-          ? "translate-y-0 opacity-100"
-          : direction === "up"
-          ? "translate-y-8 opacity-0"
-          : "-translate-y-2 opacity-0"
-      }`}
+      ref={ref}
+      className={className}
+      style={{
+        opacity: inView ? 1 : 0,
+        transform: inView ? "translateY(0)" : "translateY(24px)",
+        transition: `opacity 0.6s ease ${delay}ms, transform 0.6s ease ${delay}ms`,
+      }}
     >
       {children}
     </div>
   );
-};
+}
 
-const AnimatedBackground = () => {
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePosition({ x: e.clientX, y: e.clientY });
-    };
-    window.addEventListener("mousemove", handleMouseMove);
-    return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, []);
-
+/* FeatureCard */
+function FeatureCard({
+  icon: Icon,
+  title,
+  desc,
+  color,
+}: {
+  icon: React.ElementType;
+  title: string;
+  desc: string;
+  color: string;
+}) {
   return (
-    <div className="fixed inset-0 overflow-hidden pointer-events-none">
-      <div className="absolute inset-0 bg-[#000000]">
-        {/* <div
-          className="absolute w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse"
-          style={{
-            left: mousePosition.x * 0.1 - 192,
-            top: mousePosition.y * 0.1 - 192,
-          }}
-        />
-        <div className="absolute top-1/4 right-1/4 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-700" />
-        <div className="absolute bottom-1/3 left-1/4 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl animate-pulse delay-1000" /> */}
+    <div className="bg-white rounded-2xl border border-gray-100 p-6 sm:p-7 space-y-4 hover:border-indigo-100 hover:shadow-sm transition-all group">
+      <div
+        className={`w-11 h-11 rounded-xl ${color} flex items-center justify-center flex-shrink-0`}
+      >
+        <Icon size={20} className="text-white" />
       </div>
-      {/* <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:50px_50px]" /> */}
+      <div className="space-y-1.5">
+        <h3 className="text-base font-bold text-gray-900 group-hover:text-indigo-700 transition-colors">
+          {title}
+        </h3>
+        <p className="text-sm text-gray-500 leading-relaxed">{desc}</p>
+      </div>
     </div>
   );
-};
+}
 
+/* Stat */
+function Stat({ n, label }: { n: string; label: string }) {
+  return (
+    <div className="text-center space-y-1">
+      <p className="text-2xl sm:text-3xl font-extrabold text-indigo-600 tracking-tight">
+        {n}
+      </p>
+      <p className="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wider">
+        {label}
+      </p>
+    </div>
+  );
+}
+
+/* ScreenFrame */
+function ScreenFrame({
+  label,
+  src,
+  className = "",
+}: {
+  label: string;
+  src?: any;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`relative rounded-2xl border border-gray-200 bg-white shadow-md overflow-hidden ${className}`}
+    >
+      {src ? (
+        <Image
+          src={src}
+          alt={label}
+          fill
+          className="object-cover object-top"
+          unoptimized
+        />
+      ) : (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-indigo-50 to-violet-50/60">
+          <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center">
+            <Layers size={18} className="text-indigo-400" />
+          </div>
+          <p className="text-[11px] font-semibold text-indigo-300 uppercase tracking-widest text-center px-4">
+            {label}
+          </p>
+        </div>
+      )}
+      <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-black/5 pointer-events-none" />
+    </div>
+  );
+}
+
+/* Static data */
+const FEATURES = [
+  {
+    icon: Bookmark,
+    title: "Clip anything",
+    color: "bg-indigo-500",
+    desc: "Save moments from films, podcasts, YouTube, articles, books, and more. If it moved you, capture it.",
+  },
+  {
+    icon: Tag,
+    title: "Tag and filter",
+    color: "bg-violet-500",
+    desc: "Rich tagging, category filters, and full-text search so every snippet is findable in seconds.",
+  },
+  {
+    icon: Users,
+    title: "Follow creators",
+    color: "bg-purple-500",
+    desc: "Discover people with similar taste. Follow their reading lists, film journals, and podcast notes.",
+  },
+  {
+    icon: Lock,
+    title: "Private by default",
+    color: "bg-blue-500",
+    desc: "Your snippets are yours. Go public, followers-only, or keep it completely private — you decide.",
+  },
+  {
+    icon: Share2,
+    title: "Collections",
+    color: "bg-sky-500",
+    desc: "Group your snippets into beautiful, shareable collections. Build your own knowledge library.",
+  },
+  {
+    icon: Zap,
+    title: "Real-time feed",
+    color: "bg-indigo-400",
+    desc: "Get notified when someone likes, comments, or follows. Stay connected to your community.",
+  },
+];
+
+const CONTENT_TYPES = [
+  {
+    label: "Film & Docs",
+    icon: Film,
+    color: "bg-purple-50 text-purple-700 border-purple-100",
+  },
+  {
+    label: "Podcasts",
+    icon: Mic,
+    color: "bg-indigo-50 text-indigo-700 border-indigo-100",
+  },
+  {
+    label: "Articles",
+    icon: BookOpen,
+    color: "bg-violet-50 text-violet-700 border-violet-100",
+  },
+  {
+    label: "YouTube",
+    icon: Globe,
+    color: "bg-blue-50   text-blue-700   border-blue-100",
+  },
+  {
+    label: "Books",
+    icon: Bookmark,
+    color: "bg-sky-50    text-sky-700    border-sky-100",
+  },
+  {
+    label: "& More",
+    icon: Zap,
+    color: "bg-gray-100  text-gray-600   border-gray-200",
+  },
+];
+
+const HOW_STEPS = [
+  {
+    n: "01",
+    title: "Create a snippet",
+    desc: "Add the title, pick the content type, drop in a description, tag it, and set your visibility. Done in under a minute.",
+  },
+  {
+    n: "02",
+    title: "Build collections",
+    desc: "Group related snippets into curated collections — your podcast picks, reading list, film journal — and share with the world.",
+  },
+  {
+    n: "03",
+    title: "Discover and connect",
+    desc: "Explore what others are saving. Follow creators whose taste you trust. Build a feed that actually makes you smarter.",
+  },
+];
+
+const FOOTER_LINKS = [
+  {
+    heading: "Product",
+    links: ["Features", "Explore", "Collections", "Notifications"],
+  },
+  { heading: "Company", links: ["About", "Blog", "Careers", "Contact"] },
+  { heading: "Legal", links: ["Privacy", "Terms", "Cookies", "Status"] },
+];
+
+/* Page */
 export default function Page() {
   const { status } = useSession();
   const router = useRouter();
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    if (status === "authenticated") {
-      router.push("/dashboard");
-    }
+    if (status === "authenticated") router.push("/dashboard");
   }, [status, router]);
+
+  useEffect(() => {
+    const fn = () => setScrolled(window.scrollY > 12);
+    window.addEventListener("scroll", fn, { passive: true });
+    return () => window.removeEventListener("scroll", fn);
+  }, []);
 
   if (status === "loading") {
     return (
-      <main className="flex items-center justify-center min-h-screen text-white bg-black">
-        <p>Loading...</p>
+      <main className="flex items-center justify-center min-h-screen bg-white">
+        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
       </main>
     );
   }
 
   return (
-    <main className="relative w-full min-h-screen text-white overflow-hidden">
-      <AnimatedBackground />
-      {/* Navigation */}
-      <nav className="fixed top-0 w-full z-50 isolate transition-all duration-300 bg-black backdrop-blur border-b border-gray-700">
-        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Image src={Logo} alt="Snippit Logo" width={80} height={80} />
+    <main className="bg-[#FAFAFA] min-h-screen text-gray-900 overflow-x-hidden">
+      {/* Nav */}
+      <nav
+        className={`fixed top-0 w-full z-50 transition-all duration-300 ${
+          scrolled
+            ? "bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm"
+            : "bg-transparent backdrop-blur-sm"
+        }`}
+      >
+        <div className="max-w-6xl mx-auto px-5 sm:px-8 py-3 sm:py-4 flex items-center justify-between gap-4">
+          <Image src={Logo} alt="Snippit" width={110} height={40} priority unoptimized/>
+
+          <div className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-500">
+            <a
+              href="#features"
+              className="hover:text-gray-900 transition-colors"
+            >
+              Features
+            </a>
+            <a href="#how" className="hover:text-gray-900 transition-colors">
+              How it works
+            </a>
+            <a
+              href="#community"
+              className="hover:text-gray-900 transition-colors"
+            >
+              Community
+            </a>
           </div>
-          <div className="hidden md:flex items-center gap-4">
+
+          <div className="flex items-center gap-2 sm:gap-3">
             <Link
               href="/auth/sign-in"
-              className="text-gray-200 hover:text-blue-300 transition-colors"
+              className="hidden sm:block text-sm font-semibold text-gray-500 hover:text-gray-900 transition-colors"
             >
-              Sign In
+              Sign in
             </Link>
-
             <Link href="/auth/sign-up">
-              <Button variant="primary" size="lg">
-                Get Started
-              </Button>
+              <button className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2 bg-primary hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-all shadow-sm shadow-indigo-200 whitespace-nowrap">
+                Get started <ArrowRight size={14} />
+              </button>
             </Link>
           </div>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="relative min-h-screen flex flex-col items-center justify-center text-center px-4 pt-20">
-        <FloatingElement delay={200}>
-          <div>
-            <Image
-              src={Logo}
-              alt="Snippit Logo"
-              width={120}
-              height={120}
-              className="mx-auto"
-            />
-          </div>
-        </FloatingElement>
+      {/* Hero */}
+      <section className="relative flex items-center justify-center min-h-[70vh] sm:min-h-screen pt-32 pb-16 overflow-hidden">
+        {/* Blobs */}
+        <div className="absolute top-0 right-0 w-[500px] sm:w-[700px] h-[500px] sm:h-[700px] bg-gradient-to-bl from-indigo-50/90 via-violet-50/50 to-transparent rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-64 sm:w-80 h-64 sm:h-80 bg-blue-50/60 rounded-full blur-3xl pointer-events-none" />
 
-        <FloatingElement delay={400}>
-          <h1 className="text-5xl md:text-7xl font-bold mb-6 text-white leading-tight">
-            Capture. Curate.
-            <br />
-            <span className="bg-gradient-to-bl from-blue-100 via-pastel-blue to-accent-blue bg-clip-text text-transparent">
-              Rediscover.
-            </span>
-          </h1>
-        </FloatingElement>
-
-        <FloatingElement delay={600}>
-          <p className="max-w-2xl text-lg text-gray-400 mb-8">
-            What you read, hear, and watch shapes you. Snippit helps you keep
-            the moments that matter — and find them when they matter most.
-          </p>
-        </FloatingElement>
-
-        <FloatingElement delay={800}>
-          <div className="flex flex-col sm:flex-row gap-4 mb-12">
-            <Link href="/auth/sign-up">
-              <Button
-                type="button"
-                variant="primary"
-                size="lg"
-                className="flex items-center justify-center gap-2"
+        <div className="relative max-w-6xl mx-auto px-5 sm:px-8 w-full">
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+            {/* Left */}
+            <div className="space-y-6 sm:space-y-8 flex flex-col items-center lg:items-start text-center lg:text-left">
+              {/* Badge */}
+              <div
+                className="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-50 border border-indigo-100 rounded-full text-xs font-semibold text-indigo-700"
+                style={{
+                  opacity: 0,
+                  animation: "fadeUp 0.6s ease 100ms forwards",
+                }}
               >
-                Start Your Journey
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </Button>
-            </Link>
-          </div>
-        </FloatingElement>
+                <Star size={11} className="fill-indigo-400 text-indigo-400" />
+                Your personal knowledge archive
+              </div>
 
-        <div className="absolute bottom-4 animate-bounce">
-          <ChevronDown className="w-6 h-6 text-gray-400" />
+              {/* Headline */}
+              <h1
+                className="text-4xl sm:text-5xl font-extrabold tracking-tight leading-[1.06] text-gray-900"
+                style={{
+                  opacity: 0,
+                  animation: "fadeUp 0.7s ease 220ms forwards",
+                }}
+              >
+                Save what moves you.
+                <br />
+                <span className="text-indigo-500">Share what shapes you.</span>
+              </h1>
+
+              {/* Body */}
+              <p
+                className="text-base sm:text-lg text-gray-500 leading-relaxed max-w-md"
+                style={{
+                  opacity: 0,
+                  animation: "fadeUp 0.7s ease 360ms forwards",
+                }}
+              >
+                Clip moments from podcasts, films, articles, and videos, build
+                your collection, and discover what others are learning.
+              </p>
+
+              {/* CTAs */}
+              <div
+                className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto"
+                style={{
+                  opacity: 0,
+                  animation: "fadeUp 0.7s ease 480ms forwards",
+                }}
+              >
+                <Link href="/auth/sign-up">
+                  <button className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 bg-primary hover:bg-indigo-700 text-white font-semibold rounded-2xl transition-all shadow-md shadow-indigo-200 text-sm">
+                    Start curating for free <ArrowRight size={16} />
+                  </button>
+                </Link>
+                <Link href="/explore/posts">
+                  <button className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 bg-white hover:bg-gray-50 text-gray-700 font-semibold rounded-2xl border border-gray-200 transition-all text-sm">
+                    Browse the community <ChevronRight size={16} />
+                  </button>
+                </Link>
+              </div>
+
+              {/* Social proof */}
+              <div
+                className="flex items-center gap-3"
+                style={{
+                  opacity: 0,
+                  animation: "fadeUp 0.7s ease 600ms forwards",
+                }}
+              >
+                <div className="flex -space-x-2 flex-shrink-0">
+                  {["A", "M", "P", "S", "L"].map((l, i) => (
+                    <div
+                      key={i}
+                      className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-white bg-indigo-100 flex items-center justify-center text-[10px] font-bold text-indigo-600"
+                    >
+                      {l}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 font-medium">
+                  Joined by{" "}
+                  <span className="text-gray-700 font-semibold">1,200+</span>{" "}
+                  curious people
+                </p>
+              </div>
+            </div>
+
+            {/* Right — screenshot grid (desktop only) */}
+            <div
+              className="relative hidden lg:block"
+              style={{
+                opacity: 0,
+                animation: "fadeUp 0.9s ease 400ms forwards",
+              }}
+            >
+              <div className="grid grid-cols-5 grid-rows-6 gap-3 h-[520px]">
+                <ScreenFrame
+                  label="Post card"
+                  src={PostImg}
+                  className="col-span-3 row-span-4"
+                />
+                <ScreenFrame
+                  label="Collection"
+                  src={CollectionImg}
+                  className="col-span-2 row-span-3"
+                />
+                <ScreenFrame
+                  label="Explore feed"
+                  src={ExploreImg}
+                  className="col-span-2 row-span-3"
+                />
+                <ScreenFrame
+                  label="Profile view"
+                  src={ProfileImg}
+                  className="col-span-3 row-span-2"
+                />
+              </div>
+
+              {/* Floating — like */}
+              <div className="absolute -left-8 top-1/3 -translate-y-1/2 bg-white rounded-2xl border border-gray-100 shadow-lg px-4 py-3 flex items-center gap-3 z-10">
+                <div className="w-8 h-8 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
+                  <Heart size={14} className="text-red-500 fill-red-500" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-800">
+                    @lily liked your snippet
+                  </p>
+                  <p className="text-[10px] text-gray-400">just now</p>
+                </div>
+              </div>
+
+              {/* Floating — saved */}
+              <div className="absolute -bottom-4 left-8 bg-white rounded-2xl border border-gray-100 shadow-lg px-4 py-3 flex items-center gap-3 z-10">
+                <div className="w-8 h-8 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
+                  <Layers size={14} className="text-violet-500" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-800">
+                    12 snippets saved
+                  </p>
+                  <p className="text-[10px] text-gray-400">
+                    in your collections
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="relative py-20 px-10 bg-gray-900/30">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 bg-gradient-to-bl from-blue-100 via-pastel-blue to-accent-blue bg-clip-text text-transparent ">
-              From Content Chaos to Curated Clarity
-            </h2>
-            <p className="text-lg text-gray-400 max-w-3xl mx-auto">
-              Snippit streamlines the way you retain, revisit, and share
-              insights across content formats — from articles and podcasts to
-              films and lectures.
+      {/* Stats */}
+      <section className="py-10 sm:py-12 border-y border-gray-100 bg-white">
+        <div className="max-w-3xl mx-auto px-6 sm:px-8">
+          <Reveal className="grid grid-cols-2 sm:grid-cols-4 gap-6 sm:gap-8">
+            <Stat n="10K+" label="Snippets saved" />
+            <Stat n="6" label="Content types" />
+            <Stat n="100%" label="Free to start" />
+            <Stat n="∞" label="Collections" />
+          </Reveal>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section id="features" className="py-20 sm:py-24 px-5 sm:px-8">
+        <div className="max-w-6xl mx-auto">
+          <Reveal className="text-center mb-12 sm:mb-14">
+            <p className="text-xs font-bold text-indigo-500 uppercase tracking-widest mb-3">
+              Features
             </p>
-          </div>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-gray-900 mb-4">
+              Everything you consume,
+              <br />
+              finally organised
+            </h2>
+            <p className="text-base sm:text-lg text-gray-500 max-w-xl mx-auto">
+              One place for every insight from every format — no app switching,
+              no scattered notes.
+            </p>
+          </Reveal>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            <FeatureCard
-              icon={BookOpen}
-              title="Capture Anything"
-              description="Clip key moments from movies, podcasts, videos, articles, and more. No more scattered notes."
-              delay={200}
-            />
-            <FeatureCard
-              icon={Tag}
-              title="Organize Effortlessly"
-              description="Tag-based collections with visual card browsing, advanced filtering, and custom collections that grow with you."
-              delay={400}
-            />
-            <FeatureCard
-              icon={Share2}
-              title="Privacy & Sharing"
-              description="Private by default with selective sharing and clean highlight formats."
-              delay={600}
-            />
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+            {FEATURES.map((f, i) => (
+              <Reveal key={f.title} delay={i * 80}>
+                <FeatureCard
+                  icon={f.icon}
+                  title={f.title}
+                  desc={f.desc}
+                  color={f.color}
+                />
+              </Reveal>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="relative py-28 px-4 text-center">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-2xl md:text-5xl font-bold mb-8">
-            Turn content into lasting knowledge
-          </h2>
-          <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto leading-relaxed">
-            Don’t just consume — retain. Snippit transforms your daily content
-            into a personalized, searchable knowledge base.
-          </p>
-          <Link href="/auth/sign-up">
-            <Button type="button" variant="primary" size="lg">
-              Start Curating Now
-            </Button>
-          </Link>
+      {/* How it works */}
+      <section
+        id="how"
+        className="py-20 sm:py-24 px-5 sm:px-8 bg-white border-y border-gray-100"
+      >
+        <div className="max-w-5xl mx-auto">
+          <Reveal className="text-center mb-12 sm:mb-16">
+            <p className="text-xs font-bold text-indigo-500 uppercase tracking-widest mb-3">
+              How it works
+            </p>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-gray-900">
+              Three steps to a
+              <br />
+              smarter content life
+            </h2>
+          </Reveal>
+
+          <div className="grid sm:grid-cols-3 gap-8 sm:gap-10">
+            {HOW_STEPS.map((s, i) => (
+              <Reveal key={s.n} delay={i * 150}>
+                <div className="space-y-3 sm:space-y-4">
+                  <span className="text-4xl sm:text-5xl font-extrabold text-indigo-100 leading-none block">
+                    {s.n}
+                  </span>
+                  <h3 className="text-lg sm:text-xl font-bold text-gray-900">
+                    {s.title}
+                  </h3>
+                  <p className="text-sm text-gray-500 leading-relaxed">
+                    {s.desc}
+                  </p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Content types */}
+      <section id="community" className="py-16 sm:py-20 px-5 sm:px-8">
+        <div className="max-w-5xl mx-auto">
+          <Reveal className="text-center mb-10 sm:mb-12">
+            <p className="text-xs font-bold text-indigo-500 uppercase tracking-widest mb-3">
+              Content types
+            </p>
+            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-900 mb-3">
+              Every format, one home
+            </h2>
+            <p className="text-sm sm:text-base text-gray-500 max-w-lg mx-auto">
+              Whatever you consume, Snippit has a category for it.
+            </p>
+          </Reveal>
+
+          <Reveal
+            delay={100}
+            className="flex flex-wrap justify-center gap-2.5 sm:gap-3"
+          >
+            {CONTENT_TYPES.map(({ label, icon: Icon, color }) => (
+              <div
+                key={label}
+                className={`flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl border text-sm font-semibold ${color} hover:scale-105 transition-transform cursor-default`}
+              >
+                <Icon size={14} />
+                {label}
+              </div>
+            ))}
+          </Reveal>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="pb-20 sm:pb-24 px-5 sm:px-8">
+        <div className="max-w-3xl mx-auto">
+          <Reveal>
+            <div className="relative bg-primary rounded-3xl px-8 sm:px-10 py-14 sm:py-16 text-center overflow-hidden">
+              <div className="absolute -top-16 -right-16 w-56 h-56 bg-white/5 rounded-full pointer-events-none" />
+              <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-white/5 rounded-full pointer-events-none" />
+              <div className="absolute top-8 left-8 w-24 h-24 bg-white/5 rounded-full pointer-events-none" />
+
+              <div className="relative z-10 space-y-5 sm:space-y-6">
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight">
+                  Your knowledge,
+                  <br />
+                  beautifully organised
+                </h2>
+                <p className="text-indigo-200 text-sm sm:text-base leading-relaxed max-w-md mx-auto">
+                  Join thousands of curious people who are turning the content
+                  they consume into a lasting personal library.
+                </p>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <Link href="/auth/sign-up">
+                    <button className="w-full sm:w-auto px-7 sm:px-8 py-3.5 bg-white text-indigo-700 font-bold rounded-2xl hover:bg-indigo-50 transition-all text-sm shadow-lg">
+                      Create your free account
+                    </button>
+                  </Link>
+                  <Link href="/explore/posts">
+                    <button className="w-full sm:w-auto px-7 sm:px-8 py-3.5 bg-white/10 text-white font-semibold rounded-2xl hover:bg-white/20 transition-all text-sm border border-white/20">
+                      Explore snippets
+                    </button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </Reveal>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="relative pt-16 px-10 border-t border-gray-800">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
-            <div>
-              <Image src={Logo} alt="Snippit Logo" width={100} height={100} />
-              <p className="text-gray-400 mb-4">
-                Transform your content consumption into lasting knowledge.
+      <footer className="border-t border-gray-100 bg-white">
+        <div className="max-w-6xl mx-auto px-6 sm:px-8 py-10 sm:py-12">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-8 mb-10">
+            <div className="col-span-2 sm:col-span-3 md:col-span-2 space-y-4">
+              <Image src={Logo} alt="Snippit" width={100} height={36} unoptimized/>
+              <p className="text-sm text-gray-400 leading-relaxed max-w-xs">
+                A social platform for curious minds. Save, curate, and share the
+                content that shapes you.
               </p>
-              <div className="flex gap-4">
-                {/* Social media icons would go here */}
+            </div>
+
+            {FOOTER_LINKS.map(({ heading, links }) => (
+              <div key={heading} className="space-y-4">
+                <h4 className="text-xs font-bold text-gray-900 uppercase tracking-widest">
+                  {heading}
+                </h4>
+                <ul className="space-y-2.5">
+                  {links.map((l) => (
+                    <li key={l}>
+                      <a
+                        href="#"
+                        className="text-sm text-gray-400 hover:text-gray-900 transition-colors"
+                      >
+                        {l}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
               </div>
-            </div>
-
-            <div>
-              <h4 className="font-semibold mb-4">Product</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li>
-                  <a href="#" className="hover:text-white transition-colors">
-                    Features
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition-colors">
-                    Pricing
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition-colors">
-                    Integrations
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition-colors">
-                    API
-                  </a>
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="font-semibold mb-4">Company</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li>
-                  <a href="#" className="hover:text-white transition-colors">
-                    About
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition-colors">
-                    Blog
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition-colors">
-                    Careers
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition-colors">
-                    Contact
-                  </a>
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="font-semibold mb-4">Support</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li>
-                  <a href="#" className="hover:text-white transition-colors">
-                    Help Center
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition-colors">
-                    Privacy
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition-colors">
-                    Terms
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition-colors">
-                    Status
-                  </a>
-                </li>
-              </ul>
-            </div>
+            ))}
           </div>
 
-          <div className="py-8 border-t border-gray-800 text-center text-gray-500">
+          <div className="border-t border-gray-100 pt-7 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-400">
             <p>© {new Date().getFullYear()} Snippit. All rights reserved.</p>
+            <p>Made for curious minds everywhere</p>
           </div>
         </div>
       </footer>
+
+      <style jsx global>{`
+        @keyframes fadeUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        html {
+          scroll-behavior: smooth;
+        }
+      `}</style>
     </main>
   );
 }

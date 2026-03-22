@@ -18,7 +18,8 @@ import { signIn, getSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { LoginSchema } from "@/schemas/auth";
 import Button from "@/app/components/Button";
-import Logo from "@/assets/Snippit-logo-v2.svg";
+
+const Logo = "/assets/Snippit-logo-v2.svg";
 
 const LoginPage: React.FC = () => {
   const router = useRouter();
@@ -154,6 +155,7 @@ const LoginPage: React.FC = () => {
             width={140}
             height={40}
             className="mx-auto h-12"
+            unoptimized
           />
         </div>
 

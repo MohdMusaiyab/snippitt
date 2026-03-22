@@ -12,7 +12,6 @@ import Image from "next/image";
 import Link from "next/link";
 
 import Button from "@/app/components/Button";
-import Logo from "@/assets/Snippit-logo-v2.svg";
 
 import {
   Bookmark,
@@ -24,6 +23,8 @@ import {
   Sparkles,
   Globe,
 } from "lucide-react";
+
+const Logo = "/assets/Snippit-logo-v2.svg";
 
 const VerifyEmailPage = () => {
   const { data: session, update } = useSession();

@@ -17,7 +17,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Button from "@/app/components/Button";
-import Logo from "@/assets/Snippit-logo-v2.svg";
+
+const Logo = "/assets/Snippit-logo-v2.svg";
 
 interface SidebarProps {
   activeTab: ActiveTab;

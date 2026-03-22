@@ -27,12 +27,6 @@ const Page = async ({ params }: PageProps) => {
 
   const isOwner = profile?.isOwner || false;
 
-  // In page.tsx — verify these values
-  console.log({
-    totalCollections,
-    initialCollections: initialCollections.length,
-  });
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6">

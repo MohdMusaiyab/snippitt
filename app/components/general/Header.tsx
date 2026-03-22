@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import Logo from "@/assets/Snippit-logo-v2.svg";
 import { Bell, User } from "lucide-react";
 import NotificationBell from "./NotificationBell";
+
+const Logo = "/assets/Snippit-logo-v2.svg";
 
 interface HeaderProps {
   userId: string | null;
