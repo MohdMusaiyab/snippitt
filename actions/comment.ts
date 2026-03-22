@@ -1,6 +1,7 @@
 "use server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { createNotification } from "./notifications/createNotifications";
 
 export async function createComment(postId: string, commentText: string) {
   try {
@@ -39,6 +40,20 @@ export async function createComment(postId: string, commentText: string) {
         userId: user.id,
       },
     });
+
+    // Fetch post owner
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+      select: { userId: true },
+    });
+    if (post) {
+      await createNotification({
+        type: "COMMENT",
+        actorId: user.id,
+        userId: post.userId,
+        postId,
+      });
+    }
 
     return {
       success: true,

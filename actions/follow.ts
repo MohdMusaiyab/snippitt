@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-providers";
 import { revalidatePath } from "next/cache";
+import { createNotification } from "./notifications/createNotifications";
 
 export async function toggleFollow(targetUserId: string) {
   try {
@@ -48,6 +49,12 @@ export async function toggleFollow(targetUserId: string) {
           followerId,
           followingId: targetUserId,
         },
+      });
+
+      await createNotification({
+        type: "FOLLOW",
+        actorId: followerId,
+        userId: targetUserId,
       });
 
       // Optional: You could trigger a notification here later

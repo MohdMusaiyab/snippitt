@@ -1,6 +1,7 @@
 "use server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { createNotification } from "./notifications/createNotifications";
 
 export async function toggleLike(postId: string) {
   try {
@@ -39,6 +40,21 @@ export async function toggleLike(postId: string) {
           postId,
         },
       });
+
+      // Fetch post owner to notify
+      const post = await prisma.post.findUnique({
+        where: { id: postId },
+        select: { userId: true },
+      });
+      if (post) {
+        await createNotification({
+          type: "LIKE",
+          actorId: user.id,
+          userId: post.userId,
+          postId,
+        });
+      }
+
       return { success: true, liked: true, message: "Post liked" };
     }
   } catch (error) {

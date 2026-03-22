@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import Logo from "@/assets/Snippit-logo-v2.svg";
 import { Bell, User } from "lucide-react";
+import NotificationBell from "./NotificationBell";
 
 interface HeaderProps {
   userId: string | null;
@@ -22,13 +23,7 @@ export const Header = ({ userId }: HeaderProps) => {
 
       {/* Right Side Icons */}
       <div className="flex items-center space-x-3">
-        <Link
-          href="/notifications"
-          className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-          aria-label="Notifications"
-        >
-          <Bell className="w-6 h-6 text-gray-700" />
-        </Link>
+        <NotificationBell/>
 
         <Link
           href={`/profile/${userId}`}
