@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -22,140 +21,14 @@ import {
   ChevronRight,
   Star,
 } from "lucide-react";
+import PublicNav from "./components/general/PublicNav";
+import PublicFooter from "./components/general/PublicFooter";
+import { Reveal, FeatureCard, Stat, ScreenFrame } from "./components/general/PublicComponents";
 
-const Logo = "/assets/Snippit-logo-v2.svg";
 const PostImg = "/assets/screenshots/post.png";
 const CollectionImg = "/assets/screenshots/collection.png";
 const ProfileImg = "/assets/screenshots/profile.png";
 const ExploreImg = "/assets/screenshots/explore.png";
-
-/* useInView */
-function useInView(threshold = 0.15) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [inView, setInView] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([e]) => {
-        if (e.isIntersecting) {
-          setInView(true);
-          obs.disconnect();
-        }
-      },
-      { threshold },
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [threshold]);
-  return { ref, inView };
-}
-
-/* Reveal */
-function Reveal({
-  children,
-  delay = 0,
-  className = "",
-}: {
-  children: React.ReactNode;
-  delay?: number;
-  className?: string;
-}) {
-  const { ref, inView } = useInView();
-  return (
-    <div
-      ref={ref}
-      className={className}
-      style={{
-        opacity: inView ? 1 : 0,
-        transform: inView ? "translateY(0)" : "translateY(24px)",
-        transition: `opacity 0.6s ease ${delay}ms, transform 0.6s ease ${delay}ms`,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-/* FeatureCard */
-function FeatureCard({
-  icon: Icon,
-  title,
-  desc,
-  color,
-}: {
-  icon: React.ElementType;
-  title: string;
-  desc: string;
-  color: string;
-}) {
-  return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-6 sm:p-7 space-y-4 hover:border-indigo-100 hover:shadow-sm transition-all group">
-      <div
-        className={`w-11 h-11 rounded-xl ${color} flex items-center justify-center flex-shrink-0`}
-      >
-        <Icon size={20} className="text-white" />
-      </div>
-      <div className="space-y-1.5">
-        <h3 className="text-base font-bold text-gray-900 group-hover:text-indigo-700 transition-colors">
-          {title}
-        </h3>
-        <p className="text-sm text-gray-500 leading-relaxed">{desc}</p>
-      </div>
-    </div>
-  );
-}
-
-/* Stat */
-function Stat({ n, label }: { n: string; label: string }) {
-  return (
-    <div className="text-center space-y-1">
-      <p className="text-2xl sm:text-3xl font-extrabold text-indigo-600 tracking-tight">
-        {n}
-      </p>
-      <p className="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wider">
-        {label}
-      </p>
-    </div>
-  );
-}
-
-/* ScreenFrame */
-function ScreenFrame({
-  label,
-  src,
-  className = "",
-}: {
-  label: string;
-  src?: any;
-  className?: string;
-}) {
-  return (
-    <div
-      className={`relative rounded-2xl border border-gray-200 bg-white shadow-md overflow-hidden ${className}`}
-    >
-      {src ? (
-        <Image
-          src={src}
-          alt={label}
-          fill
-          className="object-cover object-top"
-          unoptimized
-        />
-      ) : (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-indigo-50 to-violet-50/60">
-          <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center">
-            <Layers size={18} className="text-indigo-400" />
-          </div>
-          <p className="text-[11px] font-semibold text-indigo-300 uppercase tracking-widest text-center px-4">
-            {label}
-          </p>
-        </div>
-      )}
-      <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-black/5 pointer-events-none" />
-    </div>
-  );
-}
 
 /* Static data */
 const FEATURES = [
@@ -248,30 +121,14 @@ const HOW_STEPS = [
   },
 ];
 
-const FOOTER_LINKS = [
-  {
-    heading: "Product",
-    links: ["Features", "Explore", "Collections", "Notifications"],
-  },
-  { heading: "Company", links: ["About", "Blog", "Careers", "Contact"] },
-  { heading: "Legal", links: ["Privacy", "Terms", "Cookies", "Status"] },
-];
-
 /* Page */
 export default function Page() {
   const { status } = useSession();
   const router = useRouter();
-  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     if (status === "authenticated") router.push("/dashboard");
   }, [status, router]);
-
-  useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 12);
-    window.addEventListener("scroll", fn, { passive: true });
-    return () => window.removeEventListener("scroll", fn);
-  }, []);
 
   if (status === "loading") {
     return (
@@ -283,50 +140,7 @@ export default function Page() {
 
   return (
     <main className="bg-[#FAFAFA] min-h-screen text-gray-900 overflow-x-hidden">
-      {/* Nav */}
-      <nav
-        className={`fixed top-0 w-full z-50 transition-all duration-300 ${
-          scrolled
-            ? "bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm"
-            : "bg-transparent backdrop-blur-sm"
-        }`}
-      >
-        <div className="max-w-6xl mx-auto px-5 sm:px-8 py-3 sm:py-4 flex items-center justify-between gap-4">
-          <Image src={Logo} alt="Snippit" width={110} height={40} priority unoptimized/>
-
-          <div className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-500">
-            <a
-              href="#features"
-              className="hover:text-gray-900 transition-colors"
-            >
-              Features
-            </a>
-            <a href="#how" className="hover:text-gray-900 transition-colors">
-              How it works
-            </a>
-            <a
-              href="#community"
-              className="hover:text-gray-900 transition-colors"
-            >
-              Community
-            </a>
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Link
-              href="/auth/sign-in"
-              className="hidden sm:block text-sm font-semibold text-gray-500 hover:text-gray-900 transition-colors"
-            >
-              Sign in
-            </Link>
-            <Link href="/auth/sign-up">
-              <button className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2 bg-primary hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-all shadow-sm shadow-indigo-200 whitespace-nowrap">
-                Get started <ArrowRight size={14} />
-              </button>
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <PublicNav />
 
       {/* Hero */}
       <section className="relative flex items-center justify-center min-h-[70vh] sm:min-h-screen pt-32 pb-16 overflow-hidden">
@@ -635,45 +449,7 @@ export default function Page() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-gray-100 bg-white">
-        <div className="max-w-6xl mx-auto px-6 sm:px-8 py-10 sm:py-12">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-8 mb-10">
-            <div className="col-span-2 sm:col-span-3 md:col-span-2 space-y-4">
-              <Image src={Logo} alt="Snippit" width={100} height={36} unoptimized/>
-              <p className="text-sm text-gray-400 leading-relaxed max-w-xs">
-                A social platform for curious minds. Save, curate, and share the
-                content that shapes you.
-              </p>
-            </div>
-
-            {FOOTER_LINKS.map(({ heading, links }) => (
-              <div key={heading} className="space-y-4">
-                <h4 className="text-xs font-bold text-gray-900 uppercase tracking-widest">
-                  {heading}
-                </h4>
-                <ul className="space-y-2.5">
-                  {links.map((l) => (
-                    <li key={l}>
-                      <a
-                        href="#"
-                        className="text-sm text-gray-400 hover:text-gray-900 transition-colors"
-                      >
-                        {l}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-
-          <div className="border-t border-gray-100 pt-7 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-400">
-            <p>© {new Date().getFullYear()} Snippit. All rights reserved.</p>
-            <p>Made for curious minds everywhere</p>
-          </div>
-        </div>
-      </footer>
+      <PublicFooter />
 
       <style jsx global>{`
         @keyframes fadeUp {

@@ -15,10 +15,11 @@ export async function proxy(request: NextRequest) {
     "/auth/sign-in",
     "/auth/sign-up",
     "/auth/verify-email",
-    "/contact",
-    "/about",
-    "/privacy-policy",
     "/auth/forgot-password",
+    "/about",
+    "/privacy",
+    "/terms",
+    "/cookies",
   ];
   const isPublicRoute = publicRoutes.some(
     (route) => pathname === route || pathname.startsWith(route + "/"),
