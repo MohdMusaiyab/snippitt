@@ -3,6 +3,8 @@ import prisma from "@/lib/prisma";
 import { generateOTP } from "@/lib/auth";
 import nodemailer from "nodemailer";
 import { env } from "@/lib/env";
+import { headers } from "next/headers";
+import { checkRateLimit } from "@/lib/ratelimit";
 
 // Configure nodemailer transporter
 const transporter = nodemailer.createTransport({
@@ -25,6 +27,18 @@ type ApiResponse<T = any> = {
 export async function sendVerificationToken(
   email: string
 ): Promise<ApiResponse<{ expiresAt: Date }>> {
+  const headerList = await headers();
+  const ip = headerList.get("x-forwarded-for") ?? "127.0.0.1";
+  
+  const rateLimit = await checkRateLimit("email_verification", ip, "email");
+  if (!rateLimit.success) {
+    return {
+      success: false,
+      message: "Too many verification requests. Please try again in an hour.",
+      code: "RATE_LIMIT_EXCEEDED",
+    };
+  }
+
   let createdTokenId: string | null = null;
 
   try {

@@ -2,16 +2,27 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { SignupSchema } from "@/schemas/auth";
 import { hashData } from "@/lib/auth";
+import { headers } from "next/headers";
+import { checkRateLimit } from "@/lib/ratelimit";
 
 export async function POST(request: Request) {
+  const headerList = await headers();
+  const ip = headerList.get("x-forwarded-for") ?? "127.0.0.1";
+
+  const rateLimit = await checkRateLimit("signup", ip, "auth");
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Too many signup attempts. Please try again later.",
+        code: "RATE_LIMIT_EXCEEDED",
+      },
+      { status: 429 },
+    );
+  }
+
   try {
     const body = await request.json();
-
-    // Redact sensitive fields for logging
-    const safeBody = {
-      ...body,
-      password: "[REDACTED]",
-    };
 
     // Validate the request body using Zod
     const validation = SignupSchema.safeParse(body);
