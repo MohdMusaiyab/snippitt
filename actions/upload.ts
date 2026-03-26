@@ -4,6 +4,8 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-providers";
 import { generatePresignedUrl as generateS3PresignedUrl} from "@/lib/aws_s3";
+import { headers } from "next/headers";
+import { checkRateLimit } from "@/lib/ratelimit";
 
 export interface GeneratePresignedUrlInput {
   fileName: string;
@@ -25,6 +27,21 @@ export async function generatePresignedUrlAction(
   data?: { uploadUrl: string; key: string; fileUrl: string };
 }> {
   try {
+    // 1. Check Rate Limiting
+    const headerList = await headers();
+    const ip = headerList.get("x-forwarded-for") ?? "127.0.0.1";
+    
+    // Using a specific key for this action to group limits correctly
+    const rateLimitResult = await checkRateLimit("s3_upload", ip);
+
+    if (!rateLimitResult.success) {
+      return {
+        success: false,
+        message: "Too many upload requests. Please try again later.",
+        code: "RATE_LIMIT_EXCEEDED",
+      };
+    }
+
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {

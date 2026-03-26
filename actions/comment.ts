@@ -2,8 +2,22 @@
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { createNotification } from "./notifications/createNotifications";
+import { headers } from "next/headers";
+import { checkRateLimit } from "@/lib/ratelimit";
 
 export async function createComment(postId: string, commentText: string) {
+  const headerList = await headers();
+  const ip = headerList.get("x-forwarded-for") ?? "127.0.0.1";
+  
+  const rateLimit = await checkRateLimit("create_comment", ip, "social");
+  if (!rateLimit.success) {
+    return {
+      success: false,
+      error: "You are commenting too fast. Please slow down.",
+      code: "RATE_LIMIT_EXCEEDED",
+    };
+  }
+
   try {
     // 1. Input validation
     if (!postId || typeof postId !== "string") {

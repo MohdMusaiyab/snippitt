@@ -7,6 +7,8 @@ import { AuthError } from "@/types/AuthError";
 import { generateUsername } from "./auth";
 import prisma from "./prisma";
 import { env } from "./env";
+import { headers } from "next/headers";
+import { checkRateLimit } from "./ratelimit";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -18,6 +20,18 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
+        const headerList = await headers();
+        const ip = headerList.get("x-forwarded-for") ?? "127.0.0.1";
+
+        const rateLimit = await checkRateLimit("login", ip, "login");
+        if (!rateLimit.success) {
+          throw new AuthError(
+            "RATE_LIMIT_EXCEEDED",
+            "Too many login attempts. Please try again later.",
+            429,
+          );
+        }
+
         try {
           // Validate input with the Zod schema pattern
           const validatedFields = LoginSchema.safeParse(credentials);
@@ -29,7 +43,7 @@ export const authOptions: NextAuthOptions = {
               validatedFields.error.issues.map((err) => ({
                 field: err.path.join("."),
                 message: err.message,
-              }))
+              })),
             );
           }
 
@@ -50,19 +64,19 @@ export const authOptions: NextAuthOptions = {
             throw new AuthError(
               "USER_NOT_FOUND",
               "Invalid Email or Password",
-              404
+              404,
             );
           }
           const passwordValid = await verifyData(
             validatedFields.data.password,
-            user.password
+            user.password,
           );
 
           if (!passwordValid) {
             throw new AuthError(
               "INVALID_CREDENTIALS",
               "Incorrect password",
-              401
+              401,
             );
           }
 
@@ -70,7 +84,7 @@ export const authOptions: NextAuthOptions = {
             throw new AuthError(
               "ACCOUNT_INACTIVE",
               "Your account has been deactivated",
-              403
+              403,
             );
           }
           // Return minimal user data matching your API style
@@ -91,7 +105,7 @@ export const authOptions: NextAuthOptions = {
                 code: error.code,
                 message: error.message,
                 status: error.status,
-              })
+              }),
             );
           }
 
@@ -100,7 +114,7 @@ export const authOptions: NextAuthOptions = {
               code: "AUTHENTICATION_FAILED",
               message: "Authentication failed",
               status: 500,
-            })
+            }),
           );
         }
       },
@@ -114,7 +128,7 @@ export const authOptions: NextAuthOptions = {
           email: profile.email,
           name: profile.name,
           username: generateUsername(
-            profile.name || profile.email.split("@")[0]
+            profile.name || profile.email.split("@")[0],
           ),
           image: profile.picture,
           emailVerified: true, // Google emails are automatically verified
@@ -130,11 +144,11 @@ export const authOptions: NextAuthOptions = {
         const existingUser = await prisma.user.findUnique({
           where: { email: user.email as string },
         });
-    
+
         if (existingUser) {
           // For existing users, preserve all existing data
           user.username = existingUser.username;
-          
+
           if (!existingUser.emailVerified) {
             await prisma.user.update({
               where: { id: existingUser.id },
@@ -146,14 +160,14 @@ export const authOptions: NextAuthOptions = {
           // Return true to continue the sign-in process with existing user
           return true;
         }
-    
+
         // For new users, create account with generated username
         try {
           const newUser = await prisma.user.create({
             data: {
               email: user.email as string,
               username: generateUsername(
-                user.name || user.email?.split("@")[0] || "user"
+                user.name || user.email?.split("@")[0] || "user",
               ),
               password: Math.random().toString(36).slice(-8), // Random password
               emailVerified: true,
