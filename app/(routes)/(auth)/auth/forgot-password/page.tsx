@@ -18,7 +18,7 @@ import EmailInput from "@/app/components/inputFields/EmailInput";
 import PasswordInput from "@/app/components/inputFields/PasswordInput";
 import Button from "@/app/components/Button";
 
-const Logo = "@/assets/Snippit-logo-v2.svg";
+const Logo = "/assets/Snippit-logo-v2.svg";
 
 import {
   sendPasswordResetToken,
