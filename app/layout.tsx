@@ -15,9 +15,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Snippit",
+  title: "Snippitt",
   description:
     "Your personal space for collecting and sharing highlights from your favorite content.",
+  icons: {
+    icon: "/assets/Snippit-logo-v2.svg",
+  },
 };
 
 export default function RootLayout({
