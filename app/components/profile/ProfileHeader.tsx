@@ -107,7 +107,9 @@ export default function ProfileHeader({
       const res = await updateUserProfile({
         username: editData.username,
         bio: editData.bio,
-        avatar: avatarUrl,
+
+        // send avatar url only if it was changed
+        ...(tempAvatarFile && { avatar: avatarUrl }),
       });
       if (res.success) {
         toast.success(res.message);
