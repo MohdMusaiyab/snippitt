@@ -91,7 +91,7 @@ export async function checkRateLimit(
   type: "global" | "auth" | "login" | "email" | "social" = "global"
 ) {
   if (!redis) {
-    console.warn(`⚠️ Rate limiting skipped for ${actionName} because Redis is not configured.`);
+    // console.warn(`⚠️ Rate limiting skipped for ${actionName} because Redis is not configured.`);
     return { success: true };
   }
 

@@ -36,12 +36,12 @@ export default function ProfileTabs({
             [
               {
                 key: "posts",
-                label: `Posts (${totalPosts})`,
+                label: `Posts`,
                 icon: <Grid3X3 size={14} />,
               },
               {
                 key: "collections",
-                label: `Collections (${totalCollections})`,
+                label: `Collections`,
                 icon: <FolderHeart size={14} />,
               },
             ] as const

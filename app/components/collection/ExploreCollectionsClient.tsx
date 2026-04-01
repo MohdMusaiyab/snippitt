@@ -7,7 +7,7 @@ import { getExploreCollections } from "@/actions/collection/exploreCollections";
 import { useDebounce } from "@/hooks/use-debounce";
 import { Collections as CollectionCard } from "@/app/components/collection/Collection";
 
-const ExploreCollectionsClient = ({ initialData }: { initialData: any[] }) => {
+const ExploreCollectionsClient = ({ initialData, currentUserId }: { initialData: any[], currentUserId: string | null }) => {
   const [items, setItems] = useState(initialData);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -157,7 +157,7 @@ const ExploreCollectionsClient = ({ initialData }: { initialData: any[] }) => {
             ))}
           </div>
         ) : items.length > 0 ? (
-          <CollectionCard collections={items} variant="grid" />
+          <CollectionCard collections={items} variant="grid" currentUserId={currentUserId} />
         ) : (
           <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-16 text-center space-y-3">
             <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto">

@@ -69,8 +69,8 @@ const parsed = isServer
     });
 
 if (!parsed.success) {
-  console.error("❌ Invalid environment variables:");
-  console.error(JSON.stringify(parsed.error.format(), null, 2));
+  // console.error("❌ Invalid environment variables:");
+  // console.error(JSON.stringify(parsed.error.format(), null, 2));
 
   if (process.env.NODE_ENV === "production" && isServer) {
     throw new Error("Invalid environment variables. Check the logs above.");

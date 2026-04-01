@@ -1,5 +1,7 @@
 import { getExplorePosts } from "@/actions/posts/explore";
 import ExplorePostsClient from "@/app/components/posts/ExplorePostsClient";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth-providers";
 
 export default async function ExplorePage({
   searchParams,
@@ -13,6 +15,10 @@ export default async function ExplorePage({
     perPage: 9,
     tag,
   });
+
+  const session = await getServerSession(authOptions);
+  const currentUserId = session?.user?.id || undefined;
+  
   const initialPosts = result.success ? (result.data?.posts ?? []) : [];
   const initialPagination = result.data?.pagination;
 
@@ -21,6 +27,7 @@ export default async function ExplorePage({
       initialPosts={initialPosts}
       initialPagination={initialPagination}
       initialTag={tag || ""}
+      currentUserId={currentUserId}
     />
   );
 }

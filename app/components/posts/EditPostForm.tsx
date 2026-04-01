@@ -44,7 +44,6 @@ import { getTags, checkTagExists } from "@/actions/tags";
 import { VisibilityPanel } from "../general/VisibilityPanel";
 import { MediaPreviewModal } from "./MediaPreviewModal";
 import { DeleteModal } from "../general/DeleteModal";
-import { StatsBar } from "../general/StatsBar";
 
 interface FileWithMetadata {
   id: string;
@@ -193,20 +192,7 @@ const EditPostForm = () => {
   }, [tagSearch]);
 
   const tagOptions = useMemo(() => {
-    const baseTags = [
-      "Technology",
-      "Design",
-      "Development",
-      "Business",
-      "Art",
-      "Photography",
-      "Travel",
-      "Food",
-      "Health",
-      "Education",
-    ];
     const map = new Map<string, string>();
-    baseTags.forEach((t) => map.set(t.toLowerCase(), t));
     dbTags.forEach((t) => {
       map.set(t.toLowerCase(), t.charAt(0).toUpperCase() + t.slice(1));
     });
@@ -219,8 +205,6 @@ const EditPostForm = () => {
       t.toLowerCase().includes(tagSearch.toLowerCase()),
     );
   }, [tagOptions, tagSearch]);
-
-  const displayedTags = filteredTags;
 
   const canCreateTag = useMemo(() => {
     const searchLower = tagSearch.trim().toLowerCase();
@@ -801,9 +785,6 @@ const EditPostForm = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left column (2/3) */}
             <div className="lg:col-span-2 space-y-4">
-              {/* Stats bar */}
-              <StatsBar {...stats} />
-
               {/* Tab bar */}
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-1.5 flex gap-1">
                 {(
@@ -927,166 +908,140 @@ const EditPostForm = () => {
                     </div>
 
                     {/* Tags */}
-                    <div className="p-6 sm:p-8 space-y-4 bg-gray-50/50">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Tag size={14} className="text-gray-400" />
-                          <span className="text-sm font-semibold text-gray-900">
-                            Tags
-                          </span>
-                          {formData.tags.length > 0 && (
-                            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
-                              {formData.tags.length} selected
-                            </span>
-                          )}
-                        </div>
-                        {formData.tags.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setFormData((p) => ({ ...p, tags: [] }))
-                            }
-                            className="text-xs font-medium text-gray-400 hover:text-red-500 transition-colors"
-                          >
-                            Clear all
-                          </button>
-                        )}
-                      </div>
+              <div className="p-6 sm:p-8 space-y-4 bg-gray-50/60">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Tag size={14} className="text-gray-400" />
+                    <span className="text-sm font-semibold text-gray-900">
+                      Tags
+                    </span>
+                    {formData.tags.length > 0 && (
+                      <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                        {formData.tags.length} selected
+                      </span>
+                    )}
+                  </div>
+                  {formData.tags.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData((prev) => ({ ...prev, tags: [] }))
+                      }
+                      className="text-xs font-medium text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </div>
 
-                      {/* selected pills */}
-                      {formData.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-2 p-3 bg-white rounded-xl border border-gray-100">
-                          {formData.tags.map((tag) => (
-                            <span
-                              key={tag}
-                              className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-lg text-xs font-medium"
-                            >
-                              <Hash size={10} />
-                              {tag}
-                              <button
-                                type="button"
-                                onClick={() => toggleTag(tag)}
-                                className="ml-0.5 text-indigo-400 hover:text-indigo-700 transition-colors"
-                              >
-                                <X size={11} />
-                              </button>
-                            </span>
-                          ))}
-                        </div>
+                {/* Search input */}
+                <div className="relative">
+                  <Search
+                    size={14}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  />
+                  <input
+                    type="text"
+                    value={tagSearch}
+                    onChange={(e) => setTagSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && tagSearch.trim()) {
+                        e.preventDefault();
+                        toggleTag(tagSearch.trim());
+                        setTagSearch("");
+                      }
+                    }}
+                    placeholder="Search or create a tag…"
+                    className="w-full pl-9 pr-9 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 focus:bg-white transition-all"
+                  />
+                  {isCheckingTag && (
+                    <Loader2
+                      size={13}
+                      className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-400 animate-spin"
+                    />
+                  )}
+                  {tagSearch && !isCheckingTag && (
+                    <button
+                      type="button"
+                      onClick={() => setTagSearch("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Search results */}
+                {tagSearch.trim() && (
+                  <div className="flex flex-wrap gap-2">
+                    {/* Existing tag found in DB */}
+                    {isTagInDb &&
+                      !isCheckingTag &&
+                      !formData.tags.some(
+                        (t) =>
+                          t.toLowerCase() === tagSearch.trim().toLowerCase(),
+                      ) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            toggleTag(tagSearch.trim());
+                            setTagSearch("");
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-gray-600 border border-gray-200 hover:border-indigo-200 hover:text-indigo-600 hover:bg-indigo-50 text-xs font-medium transition-all"
+                        >
+                          <Hash size={10} className="opacity-60" />
+                          {tagSearch.trim().charAt(0).toUpperCase() +
+                            tagSearch.trim().slice(1)}
+                        </button>
                       )}
 
-                      {/* Tag picker panel */}
-                      <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-4">
-                        {/* Search */}
-                        <div className="relative">
-                          <Search
-                            size={14}
-                            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                          />
-                          <input
-                            type="text"
-                            value={tagSearch}
-                            onChange={(e) => setTagSearch(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && tagSearch.trim()) {
-                                e.preventDefault();
-                                toggleTag(tagSearch.trim());
-                                setTagSearch("");
-                              }
-                            }}
-                            placeholder="Search or create a tag (Enter to add)…"
-                            className="w-full pl-9 pr-9 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 focus:bg-white transition-all"
-                          />
-                          {tagSearch && (
-                            <button
-                              type="button"
-                              onClick={() => setTagSearch("")}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                            >
-                              <X size={14} />
-                            </button>
-                          )}
-                          {isCheckingTag && (
-                            <Loader2
-                              size={13}
-                              className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-400 animate-spin"
-                            />
-                          )}
-                        </div>
+                    {/* Create new tag — only when not in DB */}
+                    {canCreateTag && !isCheckingTag && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          toggleTag(tagSearch.trim());
+                          setTagSearch("");
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dashed border-indigo-300 text-indigo-600 hover:bg-indigo-50 text-xs font-medium transition-all"
+                      >
+                        <Sparkles size={11} />
+                        Create &quot;{tagSearch.trim()}&quot;
+                      </button>
+                    )}
 
-                        {/* Tag chips */}
-                        <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto pr-1">
-                          {/* Create new */}
-                          {canCreateTag && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                toggleTag(tagSearch.trim());
-                                setTagSearch("");
-                              }}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dashed border-indigo-300 text-indigo-600 hover:bg-indigo-50 text-xs font-medium transition-all"
-                            >
-                              <Sparkles size={11} />
-                              Create &quot;{tagSearch.trim()}&quot;
-                            </button>
-                          )}
+                    {/* Still checking */}
+                    {isCheckingTag && (
+                      <span className="text-xs text-gray-400 py-1.5">
+                        Searching…
+                      </span>
+                    )}
+                  </div>
+                )}
 
-                          {/* DB match — exists in DB but not in visible list */}
-                          {isTagInDb &&
-                            !isCheckingTag &&
-                            !tagOptions.some(
-                              (t) =>
-                                t.toLowerCase() ===
-                                tagSearch.trim().toLowerCase(),
-                            ) &&
-                            !formData.tags.some(
-                              (t) =>
-                                t.toLowerCase() ===
-                                tagSearch.trim().toLowerCase(),
-                            ) && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  toggleTag(tagSearch.trim());
-                                  setTagSearch("");
-                                }}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-gray-600 border border-gray-200 hover:border-indigo-200 hover:text-indigo-600 hover:bg-indigo-50 text-xs font-medium transition-all"
-                              >
-                                <Hash size={10} className="opacity-60" />
-                                {tagSearch.trim().charAt(0).toUpperCase() +
-                                  tagSearch.trim().slice(1)}
-                              </button>
-                            )}
-
-                          {displayedTags.map((tag) => {
-                            const isSelected = formData.tags.some(
-                              (t) => t.toLowerCase() === tag.toLowerCase(),
-                            );
-                            return (
-                              <button
-                                key={tag}
-                                type="button"
-                                onClick={() => toggleTag(tag)}
-                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all
-                                ${
-                                  isSelected
-                                    ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
-                                    : "bg-white text-gray-600 border-gray-200 hover:border-indigo-200 hover:text-indigo-600 hover:bg-indigo-50"
-                                }`}
-                              >
-                                <Hash
-                                  size={10}
-                                  className={
-                                    isSelected ? "opacity-80" : "opacity-40"
-                                  }
-                                />
-                                {tag}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
+                {/* Selected tags — always visible below search */}
+                {formData.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
+                    {formData.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-xl text-xs font-medium"
+                      >
+                        <Hash size={10} />
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={() => toggleTag(tag)}
+                          className="ml-0.5 text-indigo-400 hover:text-indigo-700 transition-colors"
+                        >
+                          <X size={11} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
                   </div>
                 </div>
               )}

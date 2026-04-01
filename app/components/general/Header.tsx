@@ -16,7 +16,15 @@ export const Header = ({ userId }: HeaderProps) => {
     <header className="sticky top-0 h-16 flex-shrink-0 px-4 sm:px-6 flex items-center justify-between bg-white border-b border-gray-200 z-30">
       {/* Mobile Logo */}
       <div className="md:hidden pl-4">
-        <Image src={Logo} alt="Snippit Logo" width={100} height={32} />
+        <Link href="/dashboard">
+          <Image
+            src={Logo}
+            alt="Snippit Logo"
+            width={100}
+            height={32}
+            className="cursor-pointer"
+          />
+        </Link>
       </div>
 
       {/* Spacer for Desktop (keeps icons right-aligned) */}
@@ -24,7 +32,7 @@ export const Header = ({ userId }: HeaderProps) => {
 
       {/* Right Side Icons */}
       <div className="flex items-center space-x-3">
-        <NotificationBell/>
+        <NotificationBell />
 
         <Link
           href={`/profile/${userId}`}

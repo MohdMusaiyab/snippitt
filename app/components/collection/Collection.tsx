@@ -40,6 +40,7 @@ function getTimeAgo(date: string | Date): string {
 interface CollectionsProps {
   collections: Collection[];
   variant?: "grid" | "list";
+  currentUserId?: string | null;
   isOwner?: boolean;
   showActions?: boolean;
 }
@@ -47,6 +48,7 @@ interface CollectionsProps {
 export const Collections = ({
   collections,
   variant = "grid",
+  currentUserId,
   isOwner = false,
   showActions = true,
 }: CollectionsProps) => {
@@ -89,6 +91,7 @@ export const Collections = ({
       {collections.map((collection) => {
         const postCount = collection._count?.posts ?? 0;
         const timeLabel = getTimeAgo(collection.createdAt);
+        const isCurrentUsersCollection = currentUserId === collection.user.id;
 
         if (variant === "grid") {
           return (
@@ -129,7 +132,7 @@ export const Collections = ({
                           className="absolute right-0 mt-2 w-44 bg-white rounded-lg shadow-lg border border-gray-200 z-30 py-1"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          {isOwner && (
+                          {(isOwner || isCurrentUsersCollection) && (
                             <>
                               <Link
                                 href={`/collections/${collection.id}/edit`}
