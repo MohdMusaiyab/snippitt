@@ -356,57 +356,74 @@ const comment = await prisma.comment.create({
 ```mermaid
 flowchart LR
     subgraph Client ["Client (browser)"]
-        Hook["useNotifications() hook"]
-        State["notifications state\n+ unreadCount"]
-        Open["openDropdown()"]
+        Provider["NotificationsProvider\n(React Context)"]
+        State["notifications state\n+ unreadCount\n+ unreadCountRef"]
+        Bell["NotificationBell\n(onClick → markAllRead)"]
+        Page["NotificationsPage\n(useEffect → markAllRead)"]
     end
-
     subgraph SSE ["SSE Route Handler"]
         Route["/api/notifications/stream\nGET — auth check"]
     end
-
     subgraph Store ["Shared Singleton"]
         Conn["notificationConnections\nMap&lt;userId, controller&gt;"]
     end
-
     subgraph Actions ["Server Actions"]
         GetN["getNotifications()"]
         CreateN["createNotification()"]
         MarkRead["markAllNotificationsRead()"]
     end
-
     subgraph DB ["Database (Prisma)"]
         Notifications[(notifications table)]
     end
 
-    Hook -->|"GET /api/notifications/stream"| Route
+    Provider -->|"GET /api/notifications/stream"| Route
     Route -->|"registerConnection(userId)"| Conn
-    Route -->|"type: connected"| Hook
-    Hook -->|"triggered on connected"| GetN
+    Route -->|"type: connected"| Provider
+    Provider -->|"triggered on connected"| GetN
     GetN --> Notifications
-    Notifications -->|"signed notifications"| State
+    Notifications -->|"notifications + unreadCount"| State
 
     UserAction["User action\n(like / comment / follow)"] -->|"calls"| CreateN
     CreateN --> Notifications
     CreateN -->|"sendToUser(userId)"| Conn
-    Conn -->|"enqueue SSE event"| Hook
-    Hook -->|"type: notification"| State
+    Conn -->|"enqueue SSE event"| Provider
+    Provider -->|"type: notification → prepend + increment"| State
 
-    Open -->|"fire-and-forget"| MarkRead
+    Bell -->|"onClick (before navigation)"| MarkRead
+    Page -->|"useEffect on mount"| MarkRead
+    MarkRead -->|"guarded by unreadCountRef"| State
     MarkRead --> Notifications
 
-    Hook -->|"SSE error → 3s delay → reconnect"| Route
+    Provider -->|"SSE error → 3s delay → reconnect"| Route
 ```
 
-**Flow:**
+## Flow
 
-1. **SSE connection** — on mount, `useNotifications` opens a persistent `EventSource` to `/api/notifications/stream`. The route authenticates the user, registers a `ReadableStreamDefaultController` in the global `notificationConnections` map, and sends a `connected` handshake.
-2. **Initial fetch** — on `connected`, the hook calls `getNotifications`, which returns the 20 most recent notifications with presigned S3 avatar URLs.
-3. **Real-time push** — when a user performs an action, `createNotification` writes to the DB and calls `sendToUser`, which enqueues an SSE event directly into the target user's open stream.
-4. **Mark as read** — opening the dropdown zeroes `unreadCount` optimistically and fires `markAllNotificationsRead` in the background.
-5. **Reconnection** — on SSE error, the client waits 3 seconds, reopens the `EventSource`, and re-fetches on the next `connected` handshake.
+1. **Provider mounts** — `NotificationsProvider` is rendered once, high in the tree, wrapping `ClientShell` (which contains `Header` → `NotificationBell`). All consumers share a single state instance via React Context. There are no duplicate SSE connections or split state islands.
 
-> **Why `globalThis`:** Both the Prisma client and the SSE connection store use `globalThis` singletons to survive Turbopack HMR reloads in development. Without this, the module-level `Map` resets on every file save and connections are lost.
+2. **SSE connection** — on mount, the provider opens a persistent `EventSource` to `/api/notifications/stream`. The route authenticates the user, registers a `ReadableStreamDefaultController` in the global `notificationConnections` map, and sends a `connected` handshake.
+
+3. **Initial fetch** — on `connected`, the provider calls `getNotifications`, which returns the 20 most recent notifications with presigned S3 avatar URLs and sets both `notifications` and `unreadCount`.
+
+4. **Real-time push** — when a user performs an action, `createNotification` writes to the DB and calls `sendToUser`, which enqueues an SSE event into the target user's open stream. The provider prepends the new notification and increments `unreadCount`.
+
+5. **Mark as read** — triggered in two places, both reading from the same shared context:
+   - `NotificationBell` calls `markAllRead()` in its `onClick` handler (before navigating), so the badge clears immediately.
+   - `NotificationsPage` calls `markAllRead()` in a `useEffect` on mount, covering direct URL visits.
+   
+   `markAllRead` guards against no-op calls using `unreadCountRef` (a ref kept in sync with `unreadCount`) to avoid stale closure issues without adding `unreadCount` to the `useCallback` dep array. State is updated optimistically; `markAllNotificationsRead()` is then called as a plain `await` — never inside a `setState` updater — to avoid React's "setState during render" error.
+
+6. **Reconnection** — on SSE error, the client waits 3 seconds, reopens the `EventSource`, and re-fetches on the next `connected` handshake.
+
+## Why this structure
+
+**Context over plain hook** — the original implementation called `useNotifications()` as a plain hook in both `NotificationBell` and `NotificationsPage`. Each call created an independent state instance with its own SSE connection. Marking all read in one had no effect on the other. Lifting into a context gives a single source of truth.
+
+**`unreadCountRef` pattern** — to let `markAllRead` read the live unread count without including `unreadCount` in its `useCallback` dep array (which would recreate the function on every incoming notification, causing `useEffect([markAllRead])` in `NotificationsPage` to re-fire in a loop).
+
+**No side effects inside `setState` updaters** — calling a server action (e.g. `markAllNotificationsRead()`) inside a functional updater runs during React's render phase and triggers a "setState on Router during render" error in Next.js. All server actions are called after state setters, in normal async flow.
+
+**`globalThis` singletons** — both the Prisma client and the SSE connection store use `globalThis` singletons to survive Turbopack HMR reloads in development. Without this, the module-level `Map` resets on every file save and open connections are lost.
 
 ---
 
