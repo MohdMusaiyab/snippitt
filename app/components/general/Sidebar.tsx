@@ -9,7 +9,9 @@ import {
   FileText,
   PenLine,
   MoreHorizontal,
-  Grid,
+  UserCircle,
+  Grid3X3, 
+  FolderHeart,
   X,
 } from "lucide-react";
 import { ActiveTab } from "@/types";
@@ -64,13 +66,13 @@ const Sidebar = ({ activeTab, setActiveTab, userId }: SidebarProps) => {
     {
       label: "My Posts",
       tab: "my-posts" as ActiveTab,
-      icon: <FileText size={20} />,
+      icon: <Grid3X3 size={20} />,
       href: "/my-posts",
     },
     {
       label: "My Collections",
       tab: "my-collections" as ActiveTab,
-      icon: <BookOpen size={20} />,
+      icon: <FolderHeart size={20} />,
       href: "/my-collections",
     },
     {
@@ -82,9 +84,9 @@ const Sidebar = ({ activeTab, setActiveTab, userId }: SidebarProps) => {
   ];
 
   const exploreLinks = [
-    { label: "Users", href: "/explore/users" },
-    { label: "Collections", href: "/explore/collections" },
-    { label: "Posts", href: "/explore/posts" },
+    { label: "Users", icon: <UserCircle size={22}/>, href: "/explore/users" },
+    { label: "Posts", icon: <Grid3X3 size={22}/>, href: "/explore/posts" },
+    { label: "Collections", icon: <FolderHeart size={22}/>, href: "/explore/collections" },
   ];
 
   // --- MOBILE VIEW ---
@@ -140,15 +142,20 @@ const Sidebar = ({ activeTab, setActiveTab, userId }: SidebarProps) => {
           onClose={() => setShowExploreSheet(false)}
           title="Explore"
         >
-          <div className="grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-3 gap-4 pb-4">
             {exploreLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setShowExploreSheet(false)}
-                className="p-4 bg-gray-50 rounded-xl font-medium text-center hover:bg-gray-100"
+                className="flex flex-col items-center gap-2 pt-3 rounded-xl hover:bg-gray-50"
               >
-                {link.label}
+                <div className="p-3 bg-indigo-50 text-[#5865F2] rounded-full">
+                  {link.icon}
+                </div>
+                <span className="text-xs text-center font-medium text-gray-600">
+                  {link.label}
+                </span>
               </Link>
             ))}
           </div>
@@ -169,12 +176,12 @@ const Sidebar = ({ activeTab, setActiveTab, userId }: SidebarProps) => {
                   setShowMoreSheet(false);
                   setActiveTab(item.tab);
                 }}
-                className="flex flex-col items-center gap-2 p-3 rounded-xl hover:bg-gray-50"
+                className="flex flex-col items-center gap-2 pt-3 rounded-xl hover:bg-gray-50"
               >
                 <div className="p-3 bg-indigo-50 text-[#5865F2] rounded-full">
                   {item.icon}
                 </div>
-                <span className="text-xs font-medium text-gray-600">
+                <span className="text-xs text-center font-medium text-gray-600">
                   {item.label}
                 </span>
               </Link>
@@ -189,7 +196,9 @@ const Sidebar = ({ activeTab, setActiveTab, userId }: SidebarProps) => {
   return (
     <aside className="fixed top-0 left-0 z-40 h-screen w-64 bg-white border-r border-gray-100 flex flex-col overflow-hidden">
       <div className="py-8 px-8">
-        <Image src={Logo} alt="Logo" width={110} height={36} priority />
+        <Link href="/dashboard">
+          <Image src={Logo} alt="Logo" width={110} height={36} priority />
+        </Link>
       </div>
 
       <div className="px-4 mb-6">
@@ -293,24 +302,43 @@ const DesktopNavLink = ({ label, icon, isActive, onClick, href }: any) => (
 
 const BottomSheet = ({ isOpen, onClose, title, children }: any) => {
   if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-end">
+      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/40 animate-in fade-in duration-200"
         onClick={onClose}
       />
-      <div className="relative bg-white w-full rounded-t-[32px] p-6 pt-2 shadow-2xl animate-in slide-in-from-bottom duration-300">
-        <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto my-3" />
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-bold text-gray-900">{title}</h3>
-          <button onClick={onClose} className="p-2 bg-gray-100 rounded-full">
+
+      {/* Sheet */}
+      <div
+        className="relative w-full bg-white rounded-t-3xl shadow-2xl 
+        animate-in slide-in-from-bottom duration-300
+        max-h-[85vh] flex flex-col"
+      >
+        {/* Handle */}
+        <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mt-3 mb-2" />
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+          <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-gray-100 transition"
+          >
             <X size={18} />
           </button>
         </div>
-        {children}
+
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          {children}
+        </div>
+
+        {/* Safe bottom spacing */}
+        <div className="h-4" />
       </div>
     </div>
   );
 };
-
 export { Sidebar };

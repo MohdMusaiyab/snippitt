@@ -9,6 +9,7 @@ import {
   FileText,
   Sparkles,
   Globe,
+  ArrowLeft,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -112,6 +113,12 @@ const SignupPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-white flex items-center justify-center relative overflow-hidden px-4 py-8">
+            <button
+        onClick={() => router.back()}
+        className="absolute top-4 left-4 p-2 rounded-full bg-white/80 backdrop-blur border border-gray-200 shadow-sm hover:bg-gray-100 transition"
+      >
+        <ArrowLeft size={18} className="text-gray-600" />
+      </button>
       {/* FLOATING ICONS */}
       {iconsToRender.map(({ Icon, delay, duration, x, y }, index) => (
         <div

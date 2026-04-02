@@ -64,7 +64,7 @@ const DashboardClient = ({ data, currentUserId, currentUserName }: any) => {
       {/* ── STAT CARDS ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          label="Total Posts"
+          label="Posts"
           value={stats.postsCount}
           icon={<FileText size={18} />}
           color="text-indigo-600"
@@ -185,11 +185,22 @@ const DashboardClient = ({ data, currentUserId, currentUserName }: any) => {
 export default DashboardClient;
 
 const StatCard = ({ value, label, icon, color, bg }: any) => (
-  <div className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center gap-4 transition-all hover:border-indigo-100">
-    <div className={`p-2.5 ${bg} ${color} rounded-xl`}>{icon}</div>
-    <div>
-      <p className="text-xl font-bold text-gray-900 tabular-nums">{value}</p>
-      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+  <div className="bg-white p-3 sm:p-4 rounded-2xl border border-gray-100 flex flex-col gap-4 transition-all hover:border-indigo-100 hover:shadow-sm">
+    
+    <div className="flex items-center justify-between">
+      <div className={`p-2 ${bg} ${color} rounded-xl`}>
+        {icon}
+      </div>
+    </div>
+
+    <div className="flex gap-2 items-baseline justify-start">
+      {/* Value */}
+      <p className="text-md sm:text-lg font-bold text-gray-900 tabular-nums   leading-tight">
+        {value}
+      </p>
+
+      {/* Label */}
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
         {label}
       </p>
     </div>

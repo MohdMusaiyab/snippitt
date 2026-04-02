@@ -22,6 +22,7 @@ import {
   FileText,
   Sparkles,
   Globe,
+  ArrowLeft,
 } from "lucide-react";
 
 const Logo = "/assets/Snippit-logo-v2.svg";
@@ -168,6 +169,12 @@ const VerifyEmailPage = () => {
 
   return (
     <div className="h-screen bg-white flex items-center justify-center relative overflow-hidden px-4">
+      <button
+        onClick={() => router.back()}
+        className="absolute top-4 left-4 p-2 rounded-full bg-white/80 backdrop-blur border border-gray-200 shadow-sm hover:bg-gray-100 transition"
+      >
+        <ArrowLeft size={18} className="text-gray-600" />
+      </button>
       {/* Floating icons */}
       {iconsToRender.map(({ Icon, delay, duration, x, y }, i) => (
         <div

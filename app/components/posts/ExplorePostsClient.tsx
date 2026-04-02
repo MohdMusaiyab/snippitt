@@ -16,6 +16,7 @@ interface ExploreProps {
     | { total: number; pages: number; currentPage: number }
     | undefined;
   initialTag?: string;
+  currentUserId: string | undefined;
 }
 
 const PostSkeleton = () => (
@@ -40,6 +41,7 @@ const ExplorePostsClient = ({
   initialPosts,
   initialPagination,
   initialTag,
+  currentUserId,
 }: ExploreProps) => {
   const [posts, setPosts] = useState<Post[]>(initialPosts);
   const [loading, setLoading] = useState(false);
@@ -271,7 +273,7 @@ const ExplorePostsClient = ({
                     <Snippet
                       post={post}
                       menuOpen={menuOpen}
-                      currentUserId={post.user.id}
+                      currentUserId={currentUserId}
                       toggleMenu={toggleMenu}
                       showActions={true}
                     />

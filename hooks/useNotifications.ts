@@ -70,23 +70,18 @@ useEffect(() => {
   return () => eventSource.close();
 }, [fetchNotifications]);
 
-  const openDropdown = useCallback(async () => {
-    setIsOpen(true);
-    if (unreadCount > 0) {
-      setUnreadCount(0);
-      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-      await markAllNotificationsRead(); // fire and forget
-    }
-  }, [unreadCount]);
-
-  const closeDropdown = useCallback(() => setIsOpen(false), []);
+  const markAllRead = useCallback(async () => {
+  if (unreadCount === 0) return;
+  setUnreadCount(0);
+  setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+  await markAllNotificationsRead(); // fire and forget
+}, [unreadCount]);
 
   return {
     notifications,
     unreadCount,
     isOpen,
     isLoading,
-    openDropdown,
-    closeDropdown,
+    markAllRead,
   };
 }

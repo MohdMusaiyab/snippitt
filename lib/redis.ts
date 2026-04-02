@@ -17,9 +17,9 @@ const redis = (env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN)
   : null;
 
 if (redis) {
-  console.log("🟢 Redis Connected Successfully");
+  // console.log("Redis Connected Successfully");
 } else {
-  console.warn("⚠️ Redis credentials missing. Redis client not initialized.");
+  // console.warn("Redis credentials missing. Redis client not initialized.");
 }
 
 export default redis;
