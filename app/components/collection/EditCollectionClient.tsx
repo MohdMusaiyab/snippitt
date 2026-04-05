@@ -135,10 +135,18 @@ const EditCollectionClient = ({
         ...formData,
         coverImage: finalCoverUrl,
       });
-      if (res.success) {
+      if (res.success && res.data) {
         setIsSubmitting(false);
         setIsRedirecting(true);
         toast.success("Collection saved!");
+
+        // Update local state with the signed URL
+        const updated = res.data;
+        if (updated.coverImage) {
+          setPreviewUrl(updated.coverImage);
+          setFormData(prev => ({ ...prev, coverImage: updated.coverImage }));
+        }
+
         setTimeout(
           () => router.push(`/collections/${initialCollection.id}`),
           200,

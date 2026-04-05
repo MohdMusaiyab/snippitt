@@ -9,9 +9,9 @@ import type { Post } from "@/schemas/post";
 import { Category, Visibility } from "@/app/generated/prisma/enums";
 import {
   changeFileVisibility,
-  deleteFile,
   extractKeyFromUrl,
   moveFileToTrash,
+  getSignedImageUrl,
 } from "@/lib/aws_s3";
 
 // Schema for image data in update
@@ -76,7 +76,11 @@ export async function updatePost(input: UpdatePostInput) {
           const newUrl = await changeFileVisibility(tempKey);
           return { ...img, url: cleanUrl(newUrl) };
         } catch (error: any) {
-          if (error.message === "SOURCE_MISSING") return { ...img, url: cleanUrl(img.url) };
+          // If a NEW image is missing from S3, we should NOT save it as it would be broken
+          if (error.message === "SOURCE_MISSING") {
+             console.error(`New image missing from S3: ${img.url}`);
+             throw new Error(`Failed to process image ${img.url}. It may not have finished uploading.`);
+          }
           throw error;
         }
       }),
@@ -176,14 +180,6 @@ export async function updatePost(input: UpdatePostInput) {
       isDraft: updatedPost.isDraft,
       createdAt: updatedPost.createdAt,
       updatedAt: updatedPost.updatedAt,
-      images: updatedPost.images.map((img) => ({
-        id: img.id,
-        url: img.url,
-        description: img.description,
-        isCover: img.isCover,
-        createdAt: img.createdAt,
-        updatedAt: img.updatedAt,
-      })),
       user: {
         id: updatedPost.userId,
         username: session.user.username || "",
@@ -197,11 +193,44 @@ export async function updatePost(input: UpdatePostInput) {
       isLiked: updatedPost.likes.length > 0,
       isSaved: updatedPost.savedBy.length > 0,
       linkTo: `/explore/posts/${updatedPost.id}`,
+      images: [], // Placeholder
     };
 
-    // Set cover image
-    const coverImage = updatedPost.images.find((img) => img.isCover);
-    transformedPost.coverImage = coverImage?.url || null;
+    // Set cover image and sign URLs for immediate display
+    if (updatedPost.images.length > 0) {
+      transformedPost.images = await Promise.all(
+        updatedPost.images.map(async (img) => {
+          try {
+            const key = extractKeyFromUrl(img.url);
+            const signedUrl = await getSignedImageUrl(key);
+            return {
+              id: img.id,
+              url: signedUrl,
+              description: img.description,
+              isCover: img.isCover,
+              createdAt: img.createdAt,
+              updatedAt: img.updatedAt,
+            };
+          } catch (e) {
+            console.error(`Failed to sign image ${img.id}:`, e);
+            return {
+              id: img.id,
+              url: img.url,
+              description: img.description,
+              isCover: img.isCover,
+              createdAt: img.createdAt,
+              updatedAt: img.updatedAt,
+            };
+          }
+        }),
+      );
+
+      const coverImage = transformedPost.images.find((img) => img.isCover);
+      transformedPost.coverImage = coverImage?.url || null;
+    } else {
+      transformedPost.images = [];
+      transformedPost.coverImage = null;
+    }
 
     return {
       success: true,

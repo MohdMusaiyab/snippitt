@@ -8,6 +8,7 @@ import {
   extractKeyFromUrl,
   changeFileVisibility,
   moveFileToTrash,
+  getSignedImageUrl,
 } from "@/lib/aws_s3";
 import { z } from "zod";
 
@@ -104,6 +105,16 @@ export async function updateCollection(
     revalidatePath(`/explore/collections/${collectionId}`);
     revalidatePath(`/collections`);
     revalidatePath(`/profile/${userId}/collections`);
+
+    // 5. Sign the cover image for immediate frontend display
+    if (updated.coverImage && updated.coverImage.includes("uploads/")) {
+      try {
+        const key = extractKeyFromUrl(updated.coverImage);
+        updated.coverImage = await getSignedImageUrl(key);
+      } catch (e) {
+        console.error("Failed to sign collection cover image:", e);
+      }
+    }
 
     return {
       success: true,

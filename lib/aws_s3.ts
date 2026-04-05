@@ -5,6 +5,7 @@ import {
   DeleteObjectCommand,
   CopyObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { env } from "./env";
@@ -50,6 +51,26 @@ export async function generatePresignedUrl(
   };
 }
 
+/**
+ * Checks if a file exists in S3 using HeadObject
+ */
+export async function checkFileExists(key: string): Promise<boolean> {
+  try {
+    await s3Client.send(
+      new HeadObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+      }),
+    );
+    return true;
+  } catch (error: any) {
+    if (error.name === "NotFound" || error.$metadata?.httpStatusCode === 404) {
+      return false;
+    }
+    throw error;
+  }
+}
+
 // export async function changeFileVisibility(oldKey: string): Promise<string> {
 //   // 1. If it's already an upload key, don't try to move it!
 //   if (oldKey.startsWith("uploads/")) {
@@ -89,6 +110,13 @@ export async function changeFileVisibility(oldKey: string): Promise<string> {
     return `https://${BUCKET_NAME}.s3.${env.AWS_REGION}.amazonaws.com/${oldKey}`;
   }
 
+  // 2. STRICTOR CHECK: Verify the source file actually exists before we try anything
+  const exists = await checkFileExists(oldKey);
+  if (!exists) {
+    console.error(`Attempted to move non-existent S3 file: ${oldKey}`);
+    throw new Error("SOURCE_MISSING");
+  }
+
   const fileName = oldKey.split("/").pop()!;
   const timestamp = Date.now();
   const randomSuffix = Math.random().toString(36).slice(2, 8);
@@ -97,7 +125,7 @@ export async function changeFileVisibility(oldKey: string): Promise<string> {
   const trashKey = `trash/${timestamp}-${fileName}`;
 
   try {
-    // 2. Copy to Permanent Location (uploads/)
+    // 3. Copy to Permanent Location (uploads/)
     await s3Client.send(
       new CopyObjectCommand({
         Bucket: BUCKET_NAME,
@@ -106,7 +134,7 @@ export async function changeFileVisibility(oldKey: string): Promise<string> {
       }),
     );
 
-    // 3. Copy to Safety Location (trash/)
+    // 4. Copy to Safety Location (trash/)
     // This allows us to recover files if the DB transaction fails later
     await s3Client.send(
       new CopyObjectCommand({
@@ -116,19 +144,13 @@ export async function changeFileVisibility(oldKey: string): Promise<string> {
       }),
     );
 
-    // 4. Delete from Temp
+    // 5. Delete from Temp
     await deleteFile(oldKey);
 
     return `https://${BUCKET_NAME}.s3.${env.AWS_REGION}.amazonaws.com/${newKey}`;
   } catch (error: any) {
-    // 5. Handle Retry Logic: If file is missing from temp, it was likely moved already
+    // 6. Handle Retry Logic if it disappeared between check and copy (rare race condition)
     if (error.Code === "NoSuchKey" || error.$metadata?.httpStatusCode === 404) {
-      console.warn(
-        `Source ${oldKey} missing. It may have been processed in a previous attempt.`,
-      );
-
-      // If the URL contains 'temp' but the file is gone,
-      // we return a specific error so the caller knows to look at the provided URL as-is
       throw new Error("SOURCE_MISSING");
     }
     throw error;
@@ -140,6 +162,12 @@ export async function changeFileVisibility(oldKey: string): Promise<string> {
  */
 export async function moveFileToTrash(key: string): Promise<void> {
   try {
+    const exists = await checkFileExists(key);
+    if (!exists) {
+      console.warn(`Attempted to trash non-existent S3 file: ${key}`);
+      return;
+    }
+
     const fileName = key.split("/").pop()!;
     const trashKey = `trash/${Date.now()}-${fileName}`;
 
@@ -201,6 +229,11 @@ export async function generatePresignedViewUrl(key: string): Promise<string> {
 
   return signedUrl;
 }
+
+/**
+ * Modern alias for generatePresignedViewUrl
+ */
+export const getSignedImageUrl = generatePresignedViewUrl;
 type PostWithImages = {
   id: string;
   coverImage: string | null;

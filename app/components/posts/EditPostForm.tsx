@@ -271,14 +271,19 @@ const EditPostForm = () => {
     })();
   }, [postId, router]);
 
-  /* cleanup blob URLs on unmount */
+  /* cleanup blob URLs on unmount only */
+  const filesRef = useRef(files);
+  useEffect(() => {
+    filesRef.current = files;
+  }, [files]);
+
   useEffect(() => {
     return () => {
-      files.forEach((f) => {
+      filesRef.current.forEach((f) => {
         if (f.preview.startsWith("blob:")) URL.revokeObjectURL(f.preview);
       });
     };
-  }, [files]);
+  }, []);
 
   /* ── derived ── */
   const stats = useMemo(
@@ -512,10 +517,12 @@ const EditPostForm = () => {
   }, []);
 
   /* ── upload ── */
-  const uploadFiles = useCallback(async (): Promise<boolean> => {
+  const uploadFiles = useCallback(async (): Promise<any[] | null> => {
     const pending = files.filter((f) => !f.isUploaded);
-    if (!pending.length) return true;
+    if (!pending.length) return files;
     setIsUploading(true);
+    let currentFiles = [...files];
+
     try {
       const results = await Promise.allSettled(
         pending.map(async (fd) => {
@@ -526,40 +533,37 @@ const EditPostForm = () => {
           if (!r.success || !r.data)
             throw new Error(r.message || "No upload URL");
           const { uploadUrl, key, fileUrl } = r.data;
+
           await new Promise<void>((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.open("PUT", uploadUrl, true);
             xhr.setRequestHeader("Content-Type", fd.file!.type);
             xhr.upload.onprogress = (e) => {
-              if (e.lengthComputable)
+              if (e.lengthComputable) {
+                const progress = Math.round((e.loaded / e.total) * 100);
                 setFiles((prev) =>
                   prev.map((f) =>
-                    f.id === fd.id
-                      ? {
-                          ...f,
-                          uploadProgress: Math.round(
-                            (e.loaded / e.total) * 100,
-                          ),
-                        }
-                      : f,
+                    f.id === fd.id ? { ...f, uploadProgress: progress } : f,
                   ),
                 );
+              }
             };
             xhr.onload = () => {
               if (xhr.status === 200) {
-                setFiles((prev) =>
-                  prev.map((f) =>
-                    f.id === fd.id
-                      ? {
-                          ...f,
-                          isUploaded: true,
-                          s3Key: key,
-                          s3Url: fileUrl,
-                          uploadProgress: 100,
-                        }
-                      : f,
-                  ),
+                // Update local tracking array
+                currentFiles = currentFiles.map((f) =>
+                  f.id === fd.id
+                    ? {
+                        ...f,
+                        isUploaded: true,
+                        s3Key: key,
+                        s3Url: fileUrl,
+                        uploadProgress: 100,
+                      }
+                    : f,
                 );
+                // Update React state
+                setFiles(currentFiles);
                 resolve();
               } else reject(new Error("Upload failed"));
             };
@@ -569,6 +573,7 @@ const EditPostForm = () => {
           return { success: true };
         }),
       );
+
       const failures = results.filter(
         (r) =>
           r.status === "rejected" ||
@@ -576,12 +581,12 @@ const EditPostForm = () => {
       );
       if (failures.length) {
         toast.error(`${failures.length} file(s) failed to upload`);
-        return false;
+        return null;
       }
-      return true;
+      return currentFiles;
     } catch {
       toast.error("Upload failed");
-      return false;
+      return null;
     } finally {
       setIsUploading(false);
     }
@@ -602,47 +607,90 @@ const EditPostForm = () => {
       return;
     }
 
+    let currentFilesForSubmit = files;
     const pending = files.filter((f) => !f.isUploaded);
     if (pending.length) {
       const confirmed = await confirmUpload(pending.length);
       if (!confirmed) return;
-      if (!(await uploadFiles())) {
+      const uploadedFiles = await uploadFiles();
+      if (!uploadedFiles) {
         toast.error("Some uploads failed");
         return;
       }
+      currentFilesForSubmit = uploadedFiles;
     }
 
-    const imgs = files.filter((f) => f.fileType === "image");
-    if (imgs.length && !files.some((f) => f.isCover)) {
-      const fi = files.findIndex((f) => f.fileType === "image");
+    const imgs = currentFilesForSubmit.filter((f) => f.fileType === "image");
+    if (imgs.length && !currentFilesForSubmit.some((f) => f.isCover)) {
+      const fi = currentFilesForSubmit.findIndex((f) => f.fileType === "image");
       setFiles((prev) => prev.map((f, i) => ({ ...f, isCover: i === fi })));
+      currentFilesForSubmit = currentFilesForSubmit.map((f, i) => ({
+        ...f,
+        isCover: i === fi,
+      }));
       toast.info("Auto-set first image as cover");
     }
 
     setIsSubmitting(true);
     try {
+      // Final validation: Ensure all files marked as uploaded actually have S3 URLs
+      const invalidFiles = currentFilesForSubmit.filter(
+        (f) => f.isUploaded && !f.s3Url && !f.existingImageId,
+      );
+      if (invalidFiles.length > 0) {
+        toast.error("Some files are not properly uploaded. Please try again.");
+        setIsSubmitting(false);
+        return;
+      }
+
       const result = await updatePost({
         id: postId,
         title: formData.title,
         description: formData.description,
         category: formData.category,
         tags: formData.tags,
-        visibility: formData.isDraft ? "PRIVATE" : formData.visibility, // draft always private
+        visibility: formData.isDraft ? "PRIVATE" : formData.visibility,
         isDraft: formData.isDraft,
-        images: files.map((f) => ({
-          url: f.isUploaded ? f.s3Url || f.preview : f.preview,
+        images: currentFilesForSubmit.map((f) => ({
+          url: f.s3Url || f.preview, // f.s3Url is guaranteed for new uploads now
           description: f.description,
           isCover: f.isCover,
           existingImageId: f.existingImageId,
         })),
       });
-      if (result.success) {
+
+      if (result.success && result.data) {
         setIsSubmitting(false);
         setIsRedirecting(true);
         toast.success(formData.isDraft ? "Saved as draft" : "Post saved!");
-        files.forEach((f) => {
+
+        // Cleanup old blob URLs
+        currentFilesForSubmit.forEach((f) => {
           if (f.preview.startsWith("blob:")) URL.revokeObjectURL(f.preview);
         });
+
+        // Update local state with fresh signed URLs
+        const updatedPost = result.data;
+        if (updatedPost.images) {
+          setFiles(
+            updatedPost.images.map((img) => ({
+              id: img.id,
+              name: img.url.split("/").pop() || "image",
+              file: null,
+              preview: img.url,
+              description: img.description || "",
+              uploadProgress: 100,
+              isUploaded: true,
+              s3Url: img.url,
+              isCover: img.isCover || false,
+              fileType: img.url.match(/\.(mp4|webm|avi|mov)$/i)
+                ? "video"
+                : "image",
+              existingImageId: img.id,
+            })),
+          );
+        }
+
         setTimeout(() => router.push(`/posts/${postId}`), 200);
       } else {
         setIsSubmitting(false);
@@ -650,6 +698,7 @@ const EditPostForm = () => {
         toast.error(result.message || "Failed to save");
       }
     } catch (e: any) {
+      console.error("Submit Error:", e);
       toast.error(e.message || "Failed to save");
     } finally {
       setIsSubmitting(false);
@@ -1292,7 +1341,7 @@ const EditPostForm = () => {
                               <div
                                 onClick={() => {
                                   setPreviewFile({
-                                    src: file.preview,
+                                    src: file.s3Url || file.preview, // Use s3Url if available, else blob
                                     type: file.fileType as "image" | "video",
                                     name: file.name || "Uploaded file",
                                   });

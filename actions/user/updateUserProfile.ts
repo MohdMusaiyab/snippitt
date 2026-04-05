@@ -7,8 +7,9 @@ import { authOptions } from "@/lib/auth-providers";
 import { revalidatePath } from "next/cache";
 import { 
   extractKeyFromUrl, 
-  deleteFile, 
-  changeFileVisibility 
+  moveFileToTrash, 
+  changeFileVisibility,
+  getSignedImageUrl
 } from "@/lib/aws_s3";
 
 // Validation Schema
@@ -66,21 +67,28 @@ export async function updateUserProfile(input: z.infer<typeof UpdateProfileSchem
     // 4. Handle Avatar Processing
     if (validatedData.avatar && validatedData.avatar !== currentUser.avatar) {
       try {
-        // If there was an old avatar, delete it from S3
-        if (currentUser.avatar) {
+        // If there was an old avatar, move it to trash (safer than delete)
+        if (currentUser.avatar && currentUser.avatar.includes("uploads/")) {
           const oldKey = extractKeyFromUrl(currentUser.avatar);
-          await deleteFile(oldKey);
+          await moveFileToTrash(oldKey);
         }
 
         // If the new avatar is in temp, move it to permanent
         if (validatedData.avatar.includes("/temp/")) {
           const newKey = extractKeyFromUrl(validatedData.avatar);
           const permanentUrl = await changeFileVisibility(newKey);
-          updatePayload.avatar = permanentUrl.split("?")[0]; // Store clean URL
+          updatePayload.avatar = permanentUrl.split("?")[0]; // Store clean URL in DB
+        } else {
+          updatePayload.avatar = validatedData.avatar.split("?")[0];
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Avatar processing error:", error);
-        // We continue anyway, but log the error
+        // If the file is missing from S3, reset the URL to avoid broken images
+        if (error.message === "SOURCE_MISSING") {
+          updatePayload.avatar = currentUser.avatar; // Keep old one or set to null
+          console.warn("Avatar source missing, reverting to current avatar");
+        }
+        // We continue with other updates, but the avatar change might be skipped
       }
     }
 
@@ -93,6 +101,17 @@ export async function updateUserProfile(input: z.infer<typeof UpdateProfileSchem
     revalidatePath(`/profile/${userId}`);
     revalidatePath("/settings/profile");
 
+    // 6. Return Signed URL for immediate frontend display
+    let finalAvatar = updatedUser.avatar;
+    if (finalAvatar && finalAvatar.includes("uploads/")) {
+      try {
+        const key = extractKeyFromUrl(finalAvatar);
+        finalAvatar = await getSignedImageUrl(key);
+      } catch (e) {
+        console.error("Failed to sign updated avatar:", e);
+      }
+    }
+
     return {
       success: true,
       message: "Profile updated successfully",
@@ -100,6 +119,7 @@ export async function updateUserProfile(input: z.infer<typeof UpdateProfileSchem
         username: updatedUser.username,
         email: updatedUser.email,
         emailVerified: !!updatedUser.emailVerified,
+        avatar: finalAvatar, // Return signed URL
       }
     };
 
