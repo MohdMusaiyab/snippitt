@@ -74,6 +74,7 @@ const CreatePostForm = () => {
     title: "",
     description: "",
     category: "",
+    tags: "",
   });
   const [tagSearch, setTagSearch] = useState("");
   const [dbTags, setDbTags] = useState<string[]>([]);
@@ -144,7 +145,7 @@ const CreatePostForm = () => {
   }, [tagSearch, tagOptions, formData.tags, isTagInDb, isCheckingTag]);
 
   const validateForm = () => {
-    const newErrors = { title: "", description: "", category: "" };
+    const newErrors = { title: "", description: "", category: "", tags: "" };
     let valid = true;
 
     if (!formData.title.trim()) {
@@ -163,6 +164,10 @@ const CreatePostForm = () => {
     }
     if (!formData.category) {
       newErrors.category = "Please select a category";
+      valid = false;
+    }
+    if (!formData.tags.length) {
+      newErrors.tags = "Please add at least one tag";
       valid = false;
     }
 
@@ -395,7 +400,13 @@ const CreatePostForm = () => {
                   <input
                     type="text"
                     value={tagSearch}
-                    onChange={(e) => setTagSearch(e.target.value)}
+                    onChange={
+                      (e) => {
+                        setTagSearch(e.target.value);
+                        if (errors.tags)
+                          setErrors({ ...errors, tags: "" });
+                      }
+                    }
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && tagSearch.trim()) {
                         e.preventDefault();
@@ -422,6 +433,12 @@ const CreatePostForm = () => {
                     </button>
                   )}
                 </div>
+                {errors.tags && (
+                  <p className="flex items-center gap-1.5 text-xs text-red-600 font-medium">
+                    <span className="w-1 h-1 rounded-full bg-red-500 inline-block flex-shrink-0" />
+                    {errors.tags}
+                  </p>
+                )}
 
                 {/* Search results */}
                 {tagSearch.trim() && (

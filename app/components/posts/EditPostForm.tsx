@@ -199,13 +199,6 @@ const EditPostForm = () => {
     return Array.from(map.values());
   }, [dbTags]);
 
-  const filteredTags = useMemo(() => {
-    if (!tagSearch.trim()) return tagOptions;
-    return tagOptions.filter((t) =>
-      t.toLowerCase().includes(tagSearch.toLowerCase()),
-    );
-  }, [tagOptions, tagSearch]);
-
   const canCreateTag = useMemo(() => {
     const searchLower = tagSearch.trim().toLowerCase();
     if (!searchLower) return false;
