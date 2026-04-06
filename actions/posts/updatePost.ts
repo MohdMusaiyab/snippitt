@@ -8,10 +8,11 @@ import { authOptions } from "@/lib/auth-providers";
 import type { Post } from "@/schemas/post";
 import { Category, Visibility } from "@/app/generated/prisma/enums";
 import {
-  changeFileVisibility,
-  extractKeyFromUrl,
+  processUploadLink,
+  safeExtractKey,
   moveFileToTrash,
   getSignedImageUrl,
+  sanitizeS3Url,
 } from "@/lib/aws_s3";
 
 // Schema for image data in update
@@ -52,17 +53,16 @@ export async function updatePost(input: UpdatePostInput) {
 
     if (!existingPost) return { success: false, message: "Post not found or access denied", code: "POST_NOT_FOUND" };
 
-    const cleanUrl = (url: string) => url.split("?")[0].split("#")[0];
-    const existingImageUrls = existingPost.images.map((img) => cleanUrl(img.url));
+    const existingImageUrls = existingPost.images.map((img) => sanitizeS3Url(img.url));
 
     const newImages = incomingImages.filter(
-      (img) => !img.existingImageId && !existingImageUrls.includes(cleanUrl(img.url)),
+      (img) => !img.existingImageId && !existingImageUrls.includes(sanitizeS3Url(img.url)),
     );
     const updatedImages = incomingImages.filter(
-      (img) => img.existingImageId && existingImageUrls.includes(cleanUrl(img.url)),
+      (img) => img.existingImageId && existingImageUrls.includes(sanitizeS3Url(img.url)),
     );
     const deletedImages = existingPost.images.filter(
-      (img) => !incomingImages.some((i) => cleanUrl(i.url) === cleanUrl(img.url)),
+      (img) => !incomingImages.some((i) => sanitizeS3Url(i.url) === sanitizeS3Url(img.url)),
     );
 
     // All heavy async work BEFORE the transaction
@@ -71,15 +71,12 @@ export async function updatePost(input: UpdatePostInput) {
     const processedNewImages = await Promise.all(
       newImages.map(async (img) => {
         try {
-          if (img.url.includes("/uploads/")) return { ...img, url: cleanUrl(img.url) };
-          const tempKey = extractKeyFromUrl(img.url);
-          const newUrl = await changeFileVisibility(tempKey);
-          return { ...img, url: cleanUrl(newUrl) };
+          const finalUrl = await processUploadLink(img.url);
+          return { ...img, url: finalUrl || img.url };
         } catch (error: any) {
-          // If a NEW image is missing from S3, we should NOT save it as it would be broken
           if (error.message === "SOURCE_MISSING") {
              console.error(`New image missing from S3: ${img.url}`);
-             throw new Error(`Failed to process image ${img.url}. It may not have finished uploading.`);
+             throw new Error(`Failed to process image. One of your uploads might have failed. Please try again.`);
           }
           throw error;
         }
@@ -89,12 +86,7 @@ export async function updatePost(input: UpdatePostInput) {
     // 2. Trash deleted images from S3
     await Promise.allSettled(
       deletedImages.map(async (img) => {
-        try {
-          const key = extractKeyFromUrl(img.url);
-          await moveFileToTrash(key);
-        } catch (error) {
-          console.error("Failed to move image to trash:", img.url, error);
-        }
+        await moveFileToTrash(img.url);
       }),
     );
 
@@ -201,8 +193,8 @@ export async function updatePost(input: UpdatePostInput) {
       transformedPost.images = await Promise.all(
         updatedPost.images.map(async (img) => {
           try {
-            const key = extractKeyFromUrl(img.url);
-            const signedUrl = await getSignedImageUrl(key);
+            const key = safeExtractKey(img.url);
+            const signedUrl = key ? await getSignedImageUrl(key) : img.url;
             return {
               id: img.id,
               url: signedUrl,

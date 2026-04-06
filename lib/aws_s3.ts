@@ -158,10 +158,17 @@ export async function changeFileVisibility(oldKey: string): Promise<string> {
 }
 
 /**
- * Helper to move existing files to trash instead of permanent deletion
+ * Helper to move existing files to trash instead of permanent deletion.
+ * Gracefully handles non-S3 URLs or missing files.
  */
-export async function moveFileToTrash(key: string): Promise<void> {
+export async function moveFileToTrash(urlOrKey: string): Promise<void> {
   try {
+    const key = urlOrKey.includes("://") ? safeExtractKey(urlOrKey) : urlOrKey;
+    if (!key) {
+      console.warn(`Skipping trash for non-S3 or malformed URL: ${urlOrKey}`);
+      return;
+    }
+
     const exists = await checkFileExists(key);
     if (!exists) {
       console.warn(`Attempted to trash non-existent S3 file: ${key}`);
@@ -202,18 +209,58 @@ export function generateFinalKey(
   const randomSuffix = Math.random().toString(36).slice(2, 8); // Avoid collisions
   return `uploads/${randomSuffix}-${sanitizedFileName}`;
 }
-export function extractKeyFromUrl(url: string): string {
+/**
+ * Unified S3 URL Sanitizer
+ * Removes query parameters and ensuring consistent formatting.
+ * Safe for null/undefined inputs.
+ */
+export function sanitizeS3Url(url: string | null | undefined): string {
+  if (!url) return "";
+  try {
+    // If it's a full URL, split at '?' or '#'
+    const [baseUrl] = url.split(/[?#]/);
+    return baseUrl;
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * Safely extracts an S3 key from a URL.
+ * Returns null if the URL is malformed or doesn't belong to our bucket.
+ */
+export function safeExtractKey(url: string | null | undefined): string | null {
+  if (!url) return null;
   try {
     const urlObj = new URL(url);
-    // Remove leading slash and any query parameters (for signed URLs)
+    // Extract key from pathname (removing leading slash)
     const fullPath = urlObj.pathname.substring(1);
-    // Split at '?' to remove query parameters if present
-    const [key] = fullPath.split("?");
-    return key;
+    const [key] = fullPath.split(/[?#]/);
+
+    // Basic validation: Is it ours? (Optional but recommended)
+    const expectedPrefix = `${BUCKET_NAME}.s3`;
+    if (!urlObj.hostname.includes(expectedPrefix) && !urlObj.hostname.includes("amazonaws.com")) {
+       // Log warning but allow if it looks like a relative path or custom domain
+       console.warn(`URL domain mismatch for S3 key extraction: ${urlObj.hostname}`);
+    }
+
+    return key || null;
   } catch (error) {
-    console.error("Error extracting key from URL:", error);
-    throw new Error("Invalid S3 URL format");
+    // If it's already a key (not a URL), return as is if it looks like a path
+    if (url.includes("/") && !url.includes("://")) {
+      return url.split(/[?#]/)[0];
+    }
+    return null;
   }
+}
+
+/**
+ * Legacy wrapper for compatibility
+ */
+export function extractKeyFromUrl(url: string): string {
+  const key = safeExtractKey(url);
+  if (!key) throw new Error("INVALID_S3_URL");
+  return key;
 }
 
 //Utitlity function to get Images with presigned URLs
@@ -243,19 +290,55 @@ export async function enhancePostsWithSignedUrls(posts: PostWithImages[]) {
   return Promise.all(
     posts.map(async (post) => {
       if (post.coverImage) {
-        const coverKey = extractKeyFromUrl(post.coverImage);
-        post.coverImage = await generatePresignedViewUrl(coverKey);
+        const coverKey = safeExtractKey(post.coverImage);
+        if (coverKey) {
+          post.coverImage = await generatePresignedViewUrl(coverKey);
+        }
       }
 
       post.images = await Promise.all(
         post.images.map(async (img) => {
-          const key = extractKeyFromUrl(img.url);
-          const signedUrl = await generatePresignedViewUrl(key);
-          return { ...img, url: signedUrl };
+          const key = safeExtractKey(img.url);
+          if (key) {
+            const signedUrl = await generatePresignedViewUrl(key);
+            return { ...img, url: signedUrl };
+          }
+          return img; // Return original if not an S3 key
         }),
       );
 
       return post;
     }),
   );
+}
+
+/**
+ * Unified Upload Processor
+ * Handles the transition from temp to permanent storage.
+ * Gracefully ignores non-S3/legacy URLs.
+ */
+export async function processUploadLink(url: string | null | undefined): Promise<string | null> {
+  if (!url) return null;
+  
+  const key = safeExtractKey(url);
+  // If we can't extract a key, it's either an external URL or malformed. 
+  // Return sanitized version of the original.
+  if (!key) return sanitizeS3Url(url);
+
+  // If it's a temp upload, move to permanent
+  if (key.startsWith("temp/")) {
+    try {
+      return await changeFileVisibility(key);
+    } catch (error: any) {
+      if (error.message === "SOURCE_MISSING") {
+         // Log and re-throw so the caller knows the upload is actually broken
+         console.error(`PROCESS_UPLOAD_FAILED: Temp file missing in S3: ${url}`);
+         throw error;
+      }
+      throw error;
+    }
+  }
+
+  // Already permanent or unknown S3 path, return sanitized URL
+  return sanitizeS3Url(url);
 }

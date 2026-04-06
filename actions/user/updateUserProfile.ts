@@ -6,10 +6,11 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-providers";
 import { revalidatePath } from "next/cache";
 import { 
-  extractKeyFromUrl, 
+  safeExtractKey, 
   moveFileToTrash, 
-  changeFileVisibility,
-  getSignedImageUrl
+  processUploadLink,
+  getSignedImageUrl,
+  sanitizeS3Url,
 } from "@/lib/aws_s3";
 
 // Validation Schema
@@ -65,30 +66,24 @@ export async function updateUserProfile(input: z.infer<typeof UpdateProfileSchem
     }
 
     // 4. Handle Avatar Processing
-    if (validatedData.avatar && validatedData.avatar !== currentUser.avatar) {
+    if (validatedData.avatar && sanitizeS3Url(validatedData.avatar) !== sanitizeS3Url(currentUser.avatar)) {
       try {
-        // If there was an old avatar, move it to trash (safer than delete)
-        if (currentUser.avatar && currentUser.avatar.includes("uploads/")) {
-          const oldKey = extractKeyFromUrl(currentUser.avatar);
-          await moveFileToTrash(oldKey);
-        }
+        // Unified processor handles move from temp and sanitization
+        const permanentUrl = await processUploadLink(validatedData.avatar);
+        updatePayload.avatar = permanentUrl;
 
-        // If the new avatar is in temp, move it to permanent
-        if (validatedData.avatar.includes("/temp/")) {
-          const newKey = extractKeyFromUrl(validatedData.avatar);
-          const permanentUrl = await changeFileVisibility(newKey);
-          updatePayload.avatar = permanentUrl.split("?")[0]; // Store clean URL in DB
-        } else {
-          updatePayload.avatar = validatedData.avatar.split("?")[0];
+        // Safely handle old avatar cleanup using the hardened trash helper
+        if (currentUser.avatar) {
+          await moveFileToTrash(currentUser.avatar);
         }
       } catch (error: any) {
         console.error("Avatar processing error:", error);
-        // If the file is missing from S3, reset the URL to avoid broken images
+        // If the file is missing from S3, we block the update to prevent a broken avatar
         if (error.message === "SOURCE_MISSING") {
-          updatePayload.avatar = currentUser.avatar; // Keep old one or set to null
-          console.warn("Avatar source missing, reverting to current avatar");
+          console.error("Avatar source missing from S3, blocking update");
+          throw new Error("Your avatar upload failed. Please try uploading it again.");
         }
-        // We continue with other updates, but the avatar change might be skipped
+        throw error;
       }
     }
 
@@ -103,10 +98,12 @@ export async function updateUserProfile(input: z.infer<typeof UpdateProfileSchem
 
     // 6. Return Signed URL for immediate frontend display
     let finalAvatar = updatedUser.avatar;
-    if (finalAvatar && finalAvatar.includes("uploads/")) {
+    if (finalAvatar) {
       try {
-        const key = extractKeyFromUrl(finalAvatar);
-        finalAvatar = await getSignedImageUrl(key);
+        const key = safeExtractKey(finalAvatar);
+        if (key) {
+          finalAvatar = await getSignedImageUrl(key);
+        }
       } catch (e) {
         console.error("Failed to sign updated avatar:", e);
       }

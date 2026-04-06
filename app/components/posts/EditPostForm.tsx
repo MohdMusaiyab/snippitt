@@ -116,8 +116,7 @@ const EditPostForm = () => {
   const [post, setPost] = useState<Post | null>(null);
   const [files, setFiles] = useState<FileWithMetadata[]>([]);
   const [viewMode, setViewMode] = useState<"details" | "media">("media");
-  const [selectedVisibility, setSelectedVisibility] =
-    useState<Visibility>("PRIVATE");
+  const [selectedVisibility, setSelectedVisibility] = useState<Visibility>("PRIVATE");
 
   const [formData, setFormData] = useState({
     title: "",
@@ -1339,33 +1338,41 @@ const EditPostForm = () => {
                             <div className="flex flex-col sm:flex-row items-start gap-3 p-4">
                               {/* Thumbnail */}
                               <div
-                                onClick={() => {
-                                  setPreviewFile({
-                                    src: file.s3Url || file.preview, // Use s3Url if available, else blob
-                                    type: file.fileType as "image" | "video",
-                                    name: file.name || "Uploaded file",
-                                  });
-                                  setPreviewError(false);
-                                }}
+                                  onClick={() => {
+                                    setPreviewFile({
+                                      src: file.preview, // Always use preview (blob or signed) for accessibility
+                                      type: file.fileType as "image" | "video",
+                                      name: file.name || "Uploaded file",
+                                    });
+                                    setPreviewError(false);
+                                  }}
                                 className="relative w-full sm:w-[72px] h-48 sm:h-[72px] rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 shadow-sm cursor-zoom-in group"
                               >
-                                {file.fileType === "image" ? (
-                                  <Image
-                                    src={file.preview}
-                                    alt={file.file?.name || "Image"}
-                                    fill
-                                    className="object-cover transition-transform duration-200 group-hover:scale-105"
-                                    unoptimized
-                                    sizes="(max-width: 640px) 100vw, 72px"
-                                  />
-                                ) : (
-                                  <video
-                                    src={file.preview}
-                                    className="absolute inset-0 w-full h-full object-cover"
-                                    muted
-                                    preload="metadata"
-                                  />
-                                )}
+                                  {file.fileType === "image" ? (
+                                    <Image
+                                      src={file.preview}
+                                      alt={file.name || "Image"}
+                                      fill
+                                      className="object-cover transition-transform duration-200 group-hover:scale-105"
+                                      unoptimized
+                                      sizes="(max-width: 640px) 100vw, 72px"
+                                      onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.src = "/placeholder-image.png"; // Fallback to local placeholder
+                                      }}
+                                    />
+                                  ) : (
+                                    <video
+                                      src={file.preview}
+                                      className="absolute inset-0 w-full h-full object-cover"
+                                      muted
+                                      preload="metadata"
+                                      onError={(e) => {
+                                        const target = e.target as HTMLVideoElement;
+                                        target.style.display = "none";
+                                      }}
+                                    />
+                                  )}
                                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-200 flex items-center justify-center">
                                   <Maximize2
                                     size={14}

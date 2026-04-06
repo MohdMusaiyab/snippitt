@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   Camera,
   Loader2,
@@ -11,8 +11,6 @@ import {
   X,
   ImageIcon,
   Settings2,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import Image from "next/image";
@@ -62,7 +60,6 @@ const EditCollectionClient = ({
   pagination = { currentPage: 1, pages: 1, total: 0 },
 }: any) => {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -236,6 +233,10 @@ const EditCollectionClient = ({
                           fill
                           className="object-cover"
                           unoptimized
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = "https://placehold.co/600x400?text=No+Cover"; 
+                          }}
                         />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center">
                           <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-xl px-3 py-2 flex items-center gap-2">

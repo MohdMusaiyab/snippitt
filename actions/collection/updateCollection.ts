@@ -5,10 +5,11 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-providers";
 import { revalidatePath } from "next/cache";
 import {
-  extractKeyFromUrl,
-  changeFileVisibility,
+  safeExtractKey,
+  processUploadLink,
   moveFileToTrash,
   getSignedImageUrl,
+  sanitizeS3Url,
 } from "@/lib/aws_s3";
 import { z } from "zod";
 
@@ -55,43 +56,22 @@ export async function updateCollection(
     };
 
     // 2. Handle Cover Image S3 Logic
-    // 2. Handle Cover Image S3 Logic
-    if (data.coverImage && data.coverImage !== existingCollection.coverImage) {
+    if (data.coverImage && sanitizeS3Url(data.coverImage) !== sanitizeS3Url(existingCollection.coverImage)) {
       try {
-        // If the new image is in the 'temp' folder, move it to 'uploads' (and 'trash')
-        if (data.coverImage.includes("/temp/")) {
-          const tempKey = extractKeyFromUrl(data.coverImage);
+        // Unified processor handles moved from temp, skipping non-S3, and sanitization
+        const permanentUrl = await processUploadLink(data.coverImage);
+        updatePayload.coverImage = permanentUrl;
 
-          // This call is now idempotent thanks to your lib/aws_s3.ts changes
-          const permanentUrl = await changeFileVisibility(tempKey);
-
-          updatePayload.coverImage = permanentUrl.split("?")[0];
-
-          // Safely handle old cover image cleanup
-          if (
-            existingCollection.coverImage &&
-            existingCollection.coverImage.includes("uploads/")
-          ) {
-            const oldKey = extractKeyFromUrl(existingCollection.coverImage);
-            // Use the trash helper instead of permanent deletion
-            await moveFileToTrash(oldKey);
-          }
-        } else {
-          // If it's already a permanent URL, just sync the sanitized version
-          updatePayload.coverImage = data.coverImage.split("?")[0];
+        // Safely handle old cover image cleanup using the hardened trash helper
+        if (existingCollection.coverImage) {
+          await moveFileToTrash(existingCollection.coverImage);
         }
       } catch (error: any) {
-        // Handle the case where a previous failed DB update already moved the file
         if (error.message === "SOURCE_MISSING") {
-          console.warn(
-            "Cover image already moved from temp, using current URL as-is",
-          );
-          updatePayload.coverImage = data.coverImage.split("?")[0];
-        } else {
-          console.error("Critical S3 Processing Error:", error);
-          // Optional: You can choose to throw here if you want to block the DB update on S3 failure
-          // throw error;
+          console.error("Cover image missing from S3, blocking update to prevent broken link");
+          throw new Error("The selected cover image is missing. Please try uploading it again.");
         }
+        throw error;
       }
     }
 
@@ -107,10 +87,12 @@ export async function updateCollection(
     revalidatePath(`/profile/${userId}/collections`);
 
     // 5. Sign the cover image for immediate frontend display
-    if (updated.coverImage && updated.coverImage.includes("uploads/")) {
+    if (updated.coverImage) {
       try {
-        const key = extractKeyFromUrl(updated.coverImage);
-        updated.coverImage = await getSignedImageUrl(key);
+        const key = safeExtractKey(updated.coverImage);
+        if (key) {
+          updated.coverImage = await getSignedImageUrl(key);
+        }
       } catch (e) {
         console.error("Failed to sign collection cover image:", e);
       }
