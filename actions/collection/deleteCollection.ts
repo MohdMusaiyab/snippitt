@@ -3,7 +3,7 @@
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-providers";
-import { extractKeyFromUrl, deleteFile } from "@/lib/aws_s3"; 
+import { safeExtractKey, moveFileToTrash } from "@/lib/aws_s3";
 import { revalidatePath } from "next/cache";
 
 export async function deleteCollection(collectionId: string) {
@@ -38,32 +38,28 @@ export async function deleteCollection(collectionId: string) {
       };
     }
 
-    // 3. Handle S3 Cleanup FIRST (Best practice: delete files before DB record)
-    if (collection.coverImage) {
-      try {
-        const fileKey = extractKeyFromUrl(collection.coverImage);
-        // Ensure we don't delete shared assets or default placeholders
-        if (fileKey.includes("uploads/")) {
-          await deleteFile(fileKey);
-        }
-      } catch (s3Error) {
-        console.error("S3 Deletion Warning:", s3Error);
-        // We continue deleting the DB record even if S3 fails
-      }
-    }
+    // 3. Delete from Database first (cascade handles related records)
+    await prisma.collection.delete({ where: { id: collectionId } });
 
-    // 4. Delete the collection from Database
-    await prisma.collection.delete({
-      where: { id: collectionId },
-    });
-
-    // 5. Clear Cache
+    // 4. Clear Cache
     revalidatePath("/dashboard/collections");
     revalidatePath(`/profile/${session.user.id}/collections`);
 
+    // 5. Async S3 cleanup — fire-and-forget, never blocks the response
+    //    Uses safeExtractKey (returns null instead of throwing on bad URLs)
+    //    and moveFileToTrash (gracefully handles missing files)
+    if (collection.coverImage) {
+      const key = safeExtractKey(collection.coverImage);
+      if (key && key.startsWith("uploads/")) {
+        moveFileToTrash(collection.coverImage).catch((e) =>
+          console.error("deleteCollection: S3 cleanup failed:", e),
+        );
+      }
+    }
+
     return {
       success: true,
-      message: "Collection and associated media deleted successfully",
+      message: "Collection deleted successfully",
       code: "SUCCESS",
     };
   } catch (error) {

@@ -60,6 +60,12 @@ interface FileWithMetadata {
   existingImageId?: string;
 }
 
+const DEFAULT_PREVIEW_IMAGE = "/assets/default.svg";
+
+/** Safely returns a valid src for <Image>. Falls back to default placeholder for null/empty/falsy. */
+const safeSrc = (url: string | null | undefined) =>
+  url && url.trim() !== "" ? url : DEFAULT_PREVIEW_IMAGE;
+
 const inputBase =
   "w-full px-4 py-3 rounded-xl border bg-gray-50 focus:bg-white text-sm text-gray-900 placeholder-gray-400 outline-none transition-all";
 
@@ -1338,19 +1344,25 @@ const EditPostForm = () => {
                             <div className="flex flex-col sm:flex-row items-start gap-3 p-4">
                               {/* Thumbnail */}
                               <div
-                                  onClick={() => {
-                                    setPreviewFile({
-                                      src: file.preview, // Always use preview (blob or signed) for accessibility
-                                      type: file.fileType as "image" | "video",
-                                      name: file.name || "Uploaded file",
-                                    });
-                                    setPreviewError(false);
-                                  }}
-                                className="relative w-full sm:w-[72px] h-48 sm:h-[72px] rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 shadow-sm cursor-zoom-in group"
+                                onClick={() => {
+                                  const src = file.preview && file.preview.trim() !== ""
+                                    ? file.preview
+                                    : null;
+                                  if (!src) return; // No valid preview — don't open a blank modal
+                                  setPreviewFile({
+                                    src,
+                                    type: file.fileType as "image" | "video",
+                                    name: file.name || "Uploaded file",
+                                  });
+                                  setPreviewError(false);
+                                }}
+                                className={`relative w-full sm:w-[72px] h-48 sm:h-[72px] rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 shadow-sm group ${
+                                  file.preview && file.preview.trim() !== "" ? "cursor-zoom-in" : "cursor-default"
+                                }`}
                               >
                                   {file.fileType === "image" ? (
                                     <Image
-                                      src={file.preview}
+                                      src={safeSrc(file.preview)}
                                       alt={file.name || "Image"}
                                       fill
                                       className="object-cover transition-transform duration-200 group-hover:scale-105"
@@ -1358,7 +1370,7 @@ const EditPostForm = () => {
                                       sizes="(max-width: 640px) 100vw, 72px"
                                       onError={(e) => {
                                         const target = e.target as HTMLImageElement;
-                                        target.src = "/placeholder-image.png"; // Fallback to local placeholder
+                                        target.src = DEFAULT_PREVIEW_IMAGE;
                                       }}
                                     />
                                   ) : (

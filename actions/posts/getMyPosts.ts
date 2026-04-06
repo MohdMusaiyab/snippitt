@@ -6,7 +6,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-providers";
 
 import type { Post } from "@/schemas/post";
-import { extractKeyFromUrl, generatePresignedViewUrl } from "@/lib/aws_s3";
+import { safeGetSignedUrl } from "@/lib/aws_s3";
 
 interface GetMyPostsOptions {
   page?: number;
@@ -18,7 +18,6 @@ interface GetMyPostsOptions {
 }
 
 export async function getMyPosts(options: GetMyPostsOptions = {}): Promise<{
-
   success: boolean;
   message: string;
   code?: string;
@@ -35,11 +34,8 @@ export async function getMyPosts(options: GetMyPostsOptions = {}): Promise<{
     currentUserId: string;
   };
 }> {
-
   const session = await getServerSession(authOptions);
   try {
-
-
     if (!session?.user?.id) {
       return {
         success: false,
@@ -53,11 +49,8 @@ export async function getMyPosts(options: GetMyPostsOptions = {}): Promise<{
     const page = options.page || 1;
     const skip = (page - 1) * perPage;
 
-    // 1. Build where clause - fetching ALL posts for the owner
-    // Owners see their own PRIVATE, PUBLIC, FOLLOWERS, and DRAFT posts.
-    const whereClause: any = {
-      userId,
-    };
+    // Build where clause — owners see ALL their posts (private, public, followers, drafts)
+    const whereClause: any = { userId };
 
     if (options.category) {
       whereClause.category = options.category;
@@ -79,75 +72,39 @@ export async function getMyPosts(options: GetMyPostsOptions = {}): Promise<{
       ];
     }
 
-    // 2. Fetch data in parallel
+    // Fetch posts and count in parallel
     const [posts, totalPosts] = await Promise.all([
       prisma.post.findMany({
         where: whereClause,
         include: {
           user: {
-            select: {
-              id: true,
-              username: true,
-              avatar: true,
-            },
+            select: { id: true, username: true, avatar: true },
           },
           images: {
             where: { isCover: true },
             take: 1,
           },
-          tags: {
-            include: { tag: true },
-          },
+          tags: { include: { tag: true } },
           _count: {
-            select: {
-              likes: true,
-              comments: true,
-              savedBy: true,
-            },
+            select: { likes: true, comments: true, savedBy: true },
           },
-          likes: {
-            where: { userId },
-            select: { userId: true },
-          },
-          savedBy: {
-            where: { userId },
-            select: { userId: true },
-          },
+          likes: { where: { userId }, select: { userId: true } },
+          savedBy: { where: { userId }, select: { userId: true } },
         },
-        orderBy: {
-          createdAt: options.sort || "desc",
-        },
+        orderBy: { createdAt: options.sort || "desc" },
         take: perPage,
-        skip: skip,
+        skip,
       }),
-      prisma.post.count({
-        where: whereClause,
-      }),
+      prisma.post.count({ where: whereClause }),
     ]);
 
-    // 3. Parallel Processing for S3 URL Signing
-    // We process all posts simultaneously for better performance
-    const getSignedUrl = async (url: string | null | undefined) => {
-      if (!url) return null;
-      // Skip signing if it's a Google avatar or already a full external URL
-      const isExternal =
-        url.includes("googleusercontent.com") ||
-        (url.includes("http") && !url.includes("amazonaws.com"));
-      if (isExternal) return url;
-
-      try {
-        const key = extractKeyFromUrl(url);
-        return await generatePresignedViewUrl(key);
-      } catch (error) {
-        return url;
-      }
-    };
+    // Sign all URLs in parallel across all posts
+    // safeGetSignedUrl handles Google avatars, missing S3 files, malformed URLs
     const postsWithSignedUrls = await Promise.all(
       posts.map(async (post) => {
-        // Sign both the cover image and the user avatar in parallel
         const [signedCoverImageUrl, signedUserAvatar] = await Promise.all([
-          getSignedUrl(post.images[0]?.url),
-          getSignedUrl(post.user.avatar),
+          safeGetSignedUrl(post.images[0]?.url ?? null),
+          safeGetSignedUrl(post.user.avatar),
         ]);
 
         return {
@@ -155,19 +112,18 @@ export async function getMyPosts(options: GetMyPostsOptions = {}): Promise<{
           title: post.title,
           description: post.description,
           category: post.category,
-          // Explicitly mapping visibility and draft status
           visibility: post.visibility as "PUBLIC" | "PRIVATE" | "FOLLOWERS",
           isDraft: post.isDraft,
           createdAt: post.createdAt,
           updatedAt: post.updatedAt,
           user: {
             ...post.user,
-            avatar: signedUserAvatar, // Fixed: Now using signed URL
+            avatar: signedUserAvatar,
           },
           coverImage: signedCoverImageUrl,
           images: post.images.map((img) => ({
             id: img.id,
-            url: signedCoverImageUrl || img.url,
+            url: signedCoverImageUrl ?? img.url,
             description: null,
             isCover: img.isCover,
             createdAt: post.createdAt,
@@ -226,27 +182,16 @@ export async function getMyPosts(options: GetMyPostsOptions = {}): Promise<{
 export async function getMyPostsStats() {
   const session = await getServerSession(authOptions);
   try {
-
-
     if (!session?.user?.id) {
-      return {
-        success: false,
-        message: "Unauthorized",
-        code: "UNAUTHORIZED",
-      };
+      return { success: false, message: "Unauthorized", code: "UNAUTHORIZED" };
     }
 
     const userId = session.user.id;
 
     const stats = await prisma.post.groupBy({
       by: ["category"],
-      where: {
-        userId,
-        isDraft: false,
-      },
-      _count: {
-        _all: true,
-      },
+      where: { userId, isDraft: false },
+      _count: { _all: true },
     });
 
     return {

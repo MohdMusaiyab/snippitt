@@ -3,7 +3,7 @@
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-providers";
-import { extractKeyFromUrl, generatePresignedViewUrl } from "@/lib/aws_s3";
+import { safeGetSignedUrl } from "@/lib/aws_s3";
 import { Post } from "@/schemas/post";
 
 interface GetCollectionParams {
@@ -30,8 +30,8 @@ export async function getCollectionWithSnippets({
           select: { id: true, username: true, avatar: true },
         },
         _count: {
-          select: { posts: true }
-        }
+          select: { posts: true },
+        },
       },
     });
 
@@ -45,18 +45,7 @@ export async function getCollectionWithSnippets({
 
     const isOwner = currentUserId === collection.userId;
 
-    // --- NEW: Sign Collection Owner Avatar ---
-    let signedOwnerAvatar = collection.user.avatar;
-    if (collection.user.avatar) {
-      try {
-        const avatarKey = extractKeyFromUrl(collection.user.avatar);
-        signedOwnerAvatar = await generatePresignedViewUrl(avatarKey);
-      } catch (e) {
-        console.error("Error signing owner avatar:", e);
-      }
-    }
-
-    // 2. Determine Relationship
+    // 2. Determine Relationship (for visibility filtering)
     let isFollowing = false;
     if (currentUserId && !isOwner) {
       const follow = await prisma.follow.findUnique({
@@ -70,7 +59,7 @@ export async function getCollectionWithSnippets({
       isFollowing = !!follow;
     }
 
-    // 3. Visibility Filter
+    // 3. Visibility Filter for snippets
     const snippetVisibilityFilter = isOwner
       ? {}
       : {
@@ -86,7 +75,7 @@ export async function getCollectionWithSnippets({
       ...snippetVisibilityFilter,
     };
 
-    // 4. Fetch the Snippets and Total Count
+    // 4. Fetch snippets and total count in parallel
     const [rawPosts, totalSnippets] = await Promise.all([
       prisma.post.findMany({
         where: whereClause,
@@ -106,44 +95,28 @@ export async function getCollectionWithSnippets({
         skip,
         take: perPage,
       }),
-      prisma.post.count({ where: whereClause })
+      prisma.post.count({ where: whereClause }),
     ]);
 
-    // 5. Transform and Sign Cover Image for the Collection
-    let signedCollectionCover = collection.coverImage;
-    if (collection.coverImage) {
-      try {
-        const key = extractKeyFromUrl(collection.coverImage);
-        signedCollectionCover = await generatePresignedViewUrl(key);
-      } catch (e) {
-        console.error("Collection cover signing error:", e);
-      }
-    }
+    // 5. Sign all URLs in parallel — safeGetSignedUrl handles:
+    //    • External URLs (Google avatars) → returned as-is
+    //    • Missing S3 files → returns null (no crash)
+    //    • Expired/malformed URLs → returns null (no crash)
+    const [signedCollectionCover, signedOwnerAvatar] = await Promise.all([
+      safeGetSignedUrl(collection.coverImage),
+      safeGetSignedUrl(collection.user.avatar),
+    ]);
 
-    // 6. Transform and Sign Snippets & Author Avatars
+    // 6. Transform and sign all snippets + their author avatars in parallel
     const snippets: Post[] = await Promise.all(
       rawPosts.map(async (p) => {
-        let signedPostCover = null;
-        let signedAuthorAvatar = p.user.avatar;
+        const coverUrl = p.images[0]?.url ?? null;
 
-        // Sign Post Cover
-        const cover = p.images[0];
-        if (cover?.url) {
-          signedPostCover = await generatePresignedViewUrl(
-            extractKeyFromUrl(cover.url),
-          );
-        }
-
-        // --- NEW: Sign Snippet Author Avatar ---
-        if (p.user.avatar) {
-          try {
-            signedAuthorAvatar = await generatePresignedViewUrl(
-              extractKeyFromUrl(p.user.avatar),
-            );
-          } catch (e) {
-            console.error("Error signing snippet author avatar:", e);
-          }
-        }
+        // Sign cover and author avatar in parallel for each snippet
+        const [signedPostCover, signedAuthorAvatar] = await Promise.all([
+          safeGetSignedUrl(coverUrl),
+          safeGetSignedUrl(p.user.avatar),
+        ]);
 
         return {
           ...p,
@@ -155,7 +128,7 @@ export async function getCollectionWithSnippets({
           },
           images: p.images.map((img) => ({
             ...img,
-            url: signedPostCover || img.url,
+            url: signedPostCover ?? img.url,
           })),
           tags: p.tags.map((t) => t.tag.name),
           isLiked: currentUserId ? p.likes.length > 0 : false,
@@ -184,7 +157,7 @@ export async function getCollectionWithSnippets({
           total: totalSnippets,
           pages: Math.ceil(totalSnippets / perPage),
           currentPage: page,
-        }
+        },
       },
     };
   } catch (error) {

@@ -1,9 +1,7 @@
 "use server";
 import { getSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import {
-  
-} from "@/lib/aws_s3";
+import { processUploadLink, safeGetSignedUrl } from "@/lib/aws_s3";
 import { Visibility } from "@/app/generated/prisma/enums";
 
 export async function createCollection(input: string | {
@@ -21,7 +19,7 @@ export async function createCollection(input: string | {
 
   const name = typeof input === "string" ? input : input.name;
   const description = typeof input === "string" ? undefined : input.description;
-  const coverImage = typeof input === "string" ? undefined : input.coverImage;
+  const rawCoverImage = typeof input === "string" ? undefined : input.coverImage;
   const visibility = typeof input === "string" ? undefined : input.visibility;
 
   try {
@@ -38,18 +36,43 @@ export async function createCollection(input: string | {
         error: { message: "Name already exists", code: "DUPLICATE" },
       };
 
+    // Process the cover image: move from temp/ → uploads/ so it's permanent
+    let coverImage: string | null = null;
+    if (rawCoverImage) {
+      try {
+        coverImage = await processUploadLink(rawCoverImage);
+      } catch (error: any) {
+        if (error.message === "SOURCE_MISSING") {
+          return {
+            success: false,
+            error: {
+              message: "Cover image upload failed — please try uploading again.",
+              code: "SOURCE_MISSING",
+            },
+          };
+        }
+        throw error;
+      }
+    }
+
     const newCol = await prisma.collection.create({
-      data: { 
-        name, 
+      data: {
+        name,
         userId: session.id,
         description,
         coverImage,
         visibility: visibility || Visibility.PRIVATE,
-        isDraft: false
+        isDraft: false,
       },
     });
 
-    return { success: true, data: newCol };
+    // Return a signed URL for immediate display (cover image was just uploaded)
+    const signedCover = await safeGetSignedUrl(newCol.coverImage);
+
+    return {
+      success: true,
+      data: { ...newCol, coverImage: signedCover },
+    };
   } catch (error) {
     console.error("Create collection error:", error);
     return {
@@ -91,9 +114,7 @@ export async function addNewPostToCollection(
     await prisma.collection.update({
       where: { id: collectionId, userId: session.id },
       data: {
-        posts: {
-          connect: { id: postId },
-        },
+        posts: { connect: { id: postId } },
       },
     });
 
@@ -139,9 +160,7 @@ export async function removePostFromCollection(
     await prisma.collection.update({
       where: { id: collectionId, userId: session.id },
       data: {
-        posts: {
-          disconnect: { id: postId },
-        },
+        posts: { disconnect: { id: postId } },
       },
     });
 
@@ -154,8 +173,8 @@ export async function removePostFromCollection(
     };
   }
 }
-//Fetching all Collections of the User
-//Add that preSigned URL for the cover image if it exists
+
+// Fetching all Collections of the User (for "add to collection" modal)
 export async function getUserCollectionNames(postId: string) {
   const session = await getSession();
   if (!session?.id)
@@ -167,7 +186,7 @@ export async function getUserCollectionNames(postId: string) {
       select: {
         id: true,
         name: true,
-        // ✅ Check if this specific post exists in the collection
+        // Check if this specific post exists in the collection
         posts: {
           where: { id: postId },
           select: { id: true },

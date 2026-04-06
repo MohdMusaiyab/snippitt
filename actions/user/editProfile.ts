@@ -1,9 +1,9 @@
 "use server";
 import { getSession } from "@/lib/auth";
 import {
-  changeFileVisibility,
-  extractKeyFromUrl,
-  generatePresignedViewUrl,
+  processUploadLink,
+  safeGetSignedUrl,
+  moveFileToTrash,
 } from "@/lib/aws_s3";
 import prisma from "@/lib/prisma";
 import { updateUserSchema } from "@/schemas/user";
@@ -44,17 +44,13 @@ export async function getBasicUserDetails() {
         },
       };
     }
-    //For avatar lets do the getting final key and then singing it
-    if (user.avatar) {
-      const avatarKey = extractKeyFromUrl(user.avatar); // REQUIRED
-      user.avatar = await generatePresignedViewUrl(avatarKey);
-    } else {
-      user.avatar = null;
-    }
+
+    // Use safeGetSignedUrl — handles Google OAuth avatars & missing S3 files gracefully
+    const signedAvatar = await safeGetSignedUrl(user.avatar);
 
     return {
       success: true,
-      data: user,
+      data: { ...user, avatar: signedAvatar },
       message: "User details fetched successfully",
       code: "SUCCESS",
     };
@@ -76,56 +72,73 @@ export async function updateUserAvatar(tempUrl: string) {
   if (!session) {
     return {
       success: false,
-      error: {
-        message: "Unauthorized",
-        code: "UNAUTHORIZED",
-      },
+      error: { message: "Unauthorized", code: "UNAUTHORIZED" },
     };
   }
 
   if (!tempUrl) {
     return {
       success: false,
-      error: {
-        message: "No avatar image provided",
-        code: "NO_AVATAR",
-      },
+      error: { message: "No avatar image provided", code: "NO_AVATAR" },
     };
   }
 
   try {
-    const tempKey = extractKeyFromUrl(tempUrl);
+    // 1. Move from temp/ → uploads/ and get clean permanent URL
+    //    processUploadLink returns the permanent URL (no ?X-Amz-Signature suffix)
+    //    This is what gets stored in the DB.
+    const permanentUrl = await processUploadLink(tempUrl);
 
-    // Move from temp/ to uploads/
-    const finalKey = await changeFileVisibility(tempKey);
+    if (!permanentUrl) {
+      return {
+        success: false,
+        error: { message: "Failed to process avatar", code: "PROCESS_FAILED" },
+      };
+    }
 
-    // Update avatar key in DB
-    await prisma.user.update({
+    // 2. Fetch current avatar so we can trash the old one
+    const currentUser = await prisma.user.findUnique({
       where: { id: session.id },
-      data: {
-        avatar: finalKey,
-      },
+      select: { avatar: true },
     });
 
-    // Return signed URL to preview
-    const signedAvatarUrl = await generatePresignedViewUrl(finalKey);
+    // 3. Store the clean permanent URL (NOT the signed URL) in the database
+    await prisma.user.update({
+      where: { id: session.id },
+      data: { avatar: permanentUrl },
+    });
+
+    // 4. Soft-delete old avatar (fire-and-forget — never blocks the response)
+    if (currentUser?.avatar) {
+      moveFileToTrash(currentUser.avatar).catch((e) =>
+        console.error("updateUserAvatar: Failed to trash old avatar:", e),
+      );
+    }
+
+    // 5. Generate a fresh signed URL for immediate client display
+    //    This expires in 1hr but that's fine — re-fetching will get a fresh one.
+    const signedAvatarUrl = await safeGetSignedUrl(permanentUrl);
 
     return {
       success: true,
       message: "Avatar updated successfully",
       code: "SUCCESS",
-      data: {
-        avatar: signedAvatarUrl,
-      },
+      data: { avatar: signedAvatarUrl },
     };
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message === "SOURCE_MISSING") {
+      return {
+        success: false,
+        error: {
+          message: "Upload failed — the image was not found. Please try again.",
+          code: "SOURCE_MISSING",
+        },
+      };
+    }
     console.error("updateUserAvatar error:", error);
     return {
       success: false,
-      error: {
-        message: "Internal server error",
-        code: "SERVER_ERROR",
-      },
+      error: { message: "Internal server error", code: "SERVER_ERROR" },
     };
   }
 }
@@ -136,10 +149,7 @@ export async function updateBasicUserInfo(formData: unknown) {
   if (!session?.id) {
     return {
       success: false,
-      error: {
-        message: "Unauthorized",
-        code: "UNAUTHORIZED",
-      },
+      error: { message: "Unauthorized", code: "UNAUTHORIZED" },
     };
   }
 
@@ -166,7 +176,7 @@ export async function updateBasicUserInfo(formData: unknown) {
         email,
         bio,
         phone,
-        isActive: deactivateAccount ?? false, // default to false if not provided
+        isActive: deactivateAccount ?? false,
       },
     });
 
@@ -188,10 +198,7 @@ export async function updateBasicUserInfo(formData: unknown) {
     console.error("updateBasicUserInfo error:", error);
     return {
       success: false,
-      error: {
-        message: "Internal server error",
-        code: "SERVER_ERROR",
-      },
+      error: { message: "Internal server error", code: "SERVER_ERROR" },
     };
   }
 }

@@ -3,7 +3,7 @@
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-providers";
-import { extractKeyFromUrl, generatePresignedViewUrl } from "@/lib/aws_s3";
+import { safeGetSignedUrl } from "@/lib/aws_s3";
 import { Collection } from "@/types";
 
 interface GetCollectionsOptions {
@@ -15,29 +15,10 @@ interface GetCollectionsOptions {
   sort?: "asc" | "desc";
 }
 
-// Reusable signing helper to handle logic in one place
-async function getSignedUrl(url: string | null | undefined) {
-  if (!url) return null;
-  const isExternal =
-    url.includes("googleusercontent.com") ||
-    (url.includes("http") && !url.includes("amazonaws.com"));
-  if (isExternal) return url;
-
-  try {
-    const key = extractKeyFromUrl(url);
-    return await generatePresignedViewUrl(key);
-  } catch {
-    console.error("S3 Signing failed for URL:", url);
-    return url; // Fallback to raw URL
-  }
-}
-
 export async function getUserCollections(options: GetCollectionsOptions = {}) {
   const session = await getServerSession(authOptions);
   try {
     const currentUserId = session?.user?.id;
-
-
     const targetUserId = options.userId || currentUserId;
 
     if (!targetUserId) {
@@ -50,9 +31,7 @@ export async function getUserCollections(options: GetCollectionsOptions = {}) {
 
     const isOwner = currentUserId === targetUserId;
 
-    const whereClause: any = {
-      userId: targetUserId,
-    };
+    const whereClause: any = { userId: targetUserId };
 
     if (isOwner) {
       if (options.visibility) {
@@ -70,7 +49,6 @@ export async function getUserCollections(options: GetCollectionsOptions = {}) {
             },
           },
         });
-
         isFollowing = !!follow;
       }
 
@@ -92,7 +70,7 @@ export async function getUserCollections(options: GetCollectionsOptions = {}) {
       ];
     }
 
-    // 2. Fetch Data
+    // Fetch data
     const [collections, total] = await Promise.all([
       prisma.collection.findMany({
         where: whereClause,
@@ -104,18 +82,16 @@ export async function getUserCollections(options: GetCollectionsOptions = {}) {
         skip,
         take: perPage,
       }),
-      prisma.collection.count({
-        where: whereClause,
-      }),
+      prisma.collection.count({ where: whereClause }),
     ]);
 
-    // 3. Transform and Sign EVERYTHING in parallel
+    // Transform and sign URLs in parallel
+    // safeGetSignedUrl handles Google avatars, missing S3 files, and malformed URLs
     const transformedCollections: Collection[] = await Promise.all(
       collections.map(async (col) => {
-        // VVIP Fix: Sign both URLs at the same time for maximum speed
         const [signedCover, signedAvatar] = await Promise.all([
-          getSignedUrl(col.coverImage),
-          getSignedUrl(col.user.avatar),
+          safeGetSignedUrl(col.coverImage),
+          safeGetSignedUrl(col.user.avatar),
         ]);
 
         return {
@@ -127,13 +103,8 @@ export async function getUserCollections(options: GetCollectionsOptions = {}) {
           isDraft: col.isDraft,
           createdAt: col.createdAt,
           updatedAt: col.updatedAt,
-          user: {
-            ...col.user,
-            avatar: signedAvatar, // FIXED: Now using the signed S3 URL
-          },
-          _count: {
-            posts: col._count.posts,
-          },
+          user: { ...col.user, avatar: signedAvatar },
+          _count: { posts: col._count.posts },
         };
       }),
     );
