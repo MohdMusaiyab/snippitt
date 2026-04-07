@@ -8,10 +8,11 @@ import { authOptions } from "@/lib/auth-providers";
 import type { Post } from "@/schemas/post";
 import { Category, Visibility } from "@/app/generated/prisma/enums";
 import {
-  changeFileVisibility,
-  deleteFile,
-  extractKeyFromUrl,
+  processUploadLink,
+  safeExtractKey,
   moveFileToTrash,
+  safeGetSignedUrl,
+  sanitizeS3Url,
 } from "@/lib/aws_s3";
 
 // Schema for image data in update
@@ -39,62 +40,99 @@ export type UpdatePostInput = z.infer<typeof UpdatePostSchema>;
 export async function updatePost(input: UpdatePostInput) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) return { success: false, message: "Unauthorized", code: "UNAUTHORIZED" };
+    if (!session?.user?.id)
+      return { success: false, message: "Unauthorized", code: "UNAUTHORIZED" };
 
     const validatedData = UpdatePostSchema.parse(input);
-    const { id: postId, title, description, tags, category, visibility, images: incomingImages, isDraft } = validatedData;
+    const {
+      id: postId,
+      title,
+      description,
+      tags,
+      category,
+      visibility,
+      images: incomingImages,
+      isDraft,
+    } = validatedData;
     const userId = session.user.id;
 
     const existingPost = await prisma.post.findUnique({
       where: { id: postId, userId },
-      include: { images: { select: { id: true, url: true, description: true, isCover: true } } },
+      include: {
+        images: {
+          select: { id: true, url: true, description: true, isCover: true },
+        },
+      },
     });
 
-    if (!existingPost) return { success: false, message: "Post not found or access denied", code: "POST_NOT_FOUND" };
+    if (!existingPost)
+      return {
+        success: false,
+        message: "Post not found or access denied",
+        code: "POST_NOT_FOUND",
+      };
 
-    const cleanUrl = (url: string) => url.split("?")[0].split("#")[0];
-    const existingImageUrls = existingPost.images.map((img) => cleanUrl(img.url));
+    // ─────────────────────────────────────────────────────────────────────────
+    // Image Categorization — ID-first strategy (robust against URL format variance)
+    //
+    // The client sends back existing images with `existingImageId` set.
+    // New uploads don't have `existingImageId`.
+    //
+    // Using IDs as the source of truth is far more reliable than comparing
+    // URLs (which can be signed, unsigned, have different query params, etc.)
+    // ─────────────────────────────────────────────────────────────────────────
 
-    const newImages = incomingImages.filter(
-      (img) => !img.existingImageId && !existingImageUrls.includes(cleanUrl(img.url)),
+    // Set of existing image IDs that the client wants to KEEP
+    const incomingExistingIds = new Set(
+      incomingImages
+        .filter((img) => img.existingImageId)
+        .map((img) => img.existingImageId!),
     );
-    const updatedImages = incomingImages.filter(
-      (img) => img.existingImageId && existingImageUrls.includes(cleanUrl(img.url)),
-    );
+
+    // Images the user removed (in DB but not in incoming list)
     const deletedImages = existingPost.images.filter(
-      (img) => !incomingImages.some((i) => cleanUrl(i.url) === cleanUrl(img.url)),
+      (img) => !incomingExistingIds.has(img.id),
     );
 
-    // All heavy async work BEFORE the transaction
+    // New images to upload (no existingImageId → fresh temp/ uploads)
+    const newImages = incomingImages.filter((img) => !img.existingImageId);
 
-    // 1. Process new images (S3 move)
+    // Existing images to update (metadata like isCover, description)
+    const updatedImages = incomingImages.filter((img) => img.existingImageId);
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // All heavy async work BEFORE the DB transaction
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // 1. Process new images: move from temp/ → uploads/ (permanent)
     const processedNewImages = await Promise.all(
       newImages.map(async (img) => {
         try {
-          if (img.url.includes("/uploads/")) return { ...img, url: cleanUrl(img.url) };
-          const tempKey = extractKeyFromUrl(img.url);
-          const newUrl = await changeFileVisibility(tempKey);
-          return { ...img, url: cleanUrl(newUrl) };
+          const finalUrl = await processUploadLink(img.url);
+          if (!finalUrl) {
+            throw new Error(
+              `processUploadLink returned null for URL: ${img.url}`,
+            );
+          }
+          return { ...img, url: finalUrl };
         } catch (error: any) {
-          if (error.message === "SOURCE_MISSING") return { ...img, url: cleanUrl(img.url) };
+          if (error.message === "SOURCE_MISSING") {
+            console.error(`New image missing from S3: ${img.url}`);
+            throw new Error(
+              "One of your uploads is missing. Please remove it and try again.",
+            );
+          }
           throw error;
         }
       }),
     );
 
-    // 2. Trash deleted images from S3
+    // 2. Soft-delete removed images from S3 (fire-and-forget — DB update proceeds regardless)
     await Promise.allSettled(
-      deletedImages.map(async (img) => {
-        try {
-          const key = extractKeyFromUrl(img.url);
-          await moveFileToTrash(key);
-        } catch (error) {
-          console.error("Failed to move image to trash:", img.url, error);
-        }
-      }),
+      deletedImages.map((img) => moveFileToTrash(img.url)),
     );
 
-    // 3. Upsert tags and get their IDs — outside transaction
+    // 3. Upsert tags outside the transaction (avoids long-running tx)
     const tagRecords = await Promise.all(
       tags.map((tagName) =>
         prisma.tag.upsert({
@@ -105,7 +143,9 @@ export async function updatePost(input: UpdatePostInput) {
       ),
     );
 
-    // Transaction is now only fast DB writes 
+    // ─────────────────────────────────────────────────────────────────────────
+    // DB Transaction — only fast writes, no S3 calls inside
+    // ─────────────────────────────────────────────────────────────────────────
     const updatedPost = await prisma.$transaction(async (tx) => {
       // Delete removed images from DB
       if (deletedImages.length > 0) {
@@ -114,10 +154,10 @@ export async function updatePost(input: UpdatePostInput) {
         });
       }
 
-      // Reset all cover flags
+      // Reset all cover flags (we'll set them correctly below)
       await tx.image.updateMany({ where: { postId }, data: { isCover: false } });
 
-      // Update post
+      // Update post core fields
       await tx.post.update({
         where: { id: postId, userId },
         data: { title, description, category, visibility, isDraft, updatedAt: new Date() },
@@ -133,7 +173,7 @@ export async function updatePost(input: UpdatePostInput) {
       if (processedNewImages.length > 0) {
         await tx.image.createMany({
           data: processedNewImages.map((img) => ({
-            url: img.url,
+            url: img.url, // Clean permanent URL (no ?X-Amz-Signature)
             description: img.description,
             postId,
             isCover: img.isCover,
@@ -141,9 +181,11 @@ export async function updatePost(input: UpdatePostInput) {
         });
       }
 
-      // Update existing images
+      // Update existing images (metadata only — url never changes for existing images)
       for (const img of updatedImages) {
-        const existing = existingPost.images.find((ex) => ex.id === img.existingImageId);
+        const existing = existingPost.images.find(
+          (ex) => ex.id === img.existingImageId,
+        );
         if (existing) {
           await tx.image.update({
             where: { id: existing.id },
@@ -152,7 +194,7 @@ export async function updatePost(input: UpdatePostInput) {
         }
       }
 
-      return await tx.post.findUnique({
+      return tx.post.findUnique({
         where: { id: postId },
         include: {
           images: { orderBy: { createdAt: "asc" } },
@@ -162,11 +204,19 @@ export async function updatePost(input: UpdatePostInput) {
           savedBy: { where: { userId }, select: { userId: true } },
         },
       });
-    }); // no timeout option needed — transaction is now fast
+    });
 
-    if (!updatedPost) return { success: false, message: "Failed to update post", code: "UPDATE_FAILED" };
+    if (!updatedPost)
+      return {
+        success: false,
+        message: "Failed to update post",
+        code: "UPDATE_FAILED",
+      };
 
-    // Transform to Post interface
+    // ─────────────────────────────────────────────────────────────────────────
+    // Build response — sign all image URLs for immediate display
+    // safeGetSignedUrl handles missing files gracefully (returns null, no crash)
+    // ─────────────────────────────────────────────────────────────────────────
     const transformedPost: Post = {
       id: updatedPost.id,
       title: updatedPost.title,
@@ -176,14 +226,6 @@ export async function updatePost(input: UpdatePostInput) {
       isDraft: updatedPost.isDraft,
       createdAt: updatedPost.createdAt,
       updatedAt: updatedPost.updatedAt,
-      images: updatedPost.images.map((img) => ({
-        id: img.id,
-        url: img.url,
-        description: img.description,
-        isCover: img.isCover,
-        createdAt: img.createdAt,
-        updatedAt: img.updatedAt,
-      })),
       user: {
         id: updatedPost.userId,
         username: session.user.username || "",
@@ -197,17 +239,34 @@ export async function updatePost(input: UpdatePostInput) {
       isLiked: updatedPost.likes.length > 0,
       isSaved: updatedPost.savedBy.length > 0,
       linkTo: `/explore/posts/${updatedPost.id}`,
+      images: [],
     };
 
-    // Set cover image
-    const coverImage = updatedPost.images.find((img) => img.isCover);
-    transformedPost.coverImage = coverImage?.url || null;
+    if (updatedPost.images.length > 0) {
+      transformedPost.images = await Promise.all(
+        updatedPost.images.map(async (img) => {
+          const signedUrl = await safeGetSignedUrl(img.url);
+          return {
+            id: img.id,
+            url: signedUrl ?? img.url, // Fallback to raw URL if signing fails
+            description: img.description,
+            isCover: img.isCover,
+            createdAt: img.createdAt,
+            updatedAt: img.updatedAt,
+          };
+        }),
+      );
+
+      const coverImage = transformedPost.images.find((img) => img.isCover);
+      transformedPost.coverImage = coverImage?.url || null;
+    } else {
+      transformedPost.images = [];
+      transformedPost.coverImage = null;
+    }
 
     return {
       success: true,
-      message: isDraft
-        ? "Draft saved successfully"
-        : "Post updated successfully",
+      message: isDraft ? "Draft saved successfully" : "Post updated successfully",
       data: transformedPost,
     };
   } catch (error) {
@@ -218,6 +277,15 @@ export async function updatePost(input: UpdatePostInput) {
         success: false,
         message: "Validation failed",
         code: "VALIDATION_ERROR",
+      };
+    }
+
+    // Surface upload-specific errors to the user
+    if (error instanceof Error && error.message.includes("missing")) {
+      return {
+        success: false,
+        message: error.message,
+        code: "UPLOAD_MISSING",
       };
     }
 

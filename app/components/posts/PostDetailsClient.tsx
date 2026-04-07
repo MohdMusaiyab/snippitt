@@ -32,6 +32,12 @@ import DeleteSnippitButton from "../general/DeleteSnippitButton";
 import ShareActionButton from "../general/ShareActionButton";
 import { env } from "@/lib/env";
 
+const DEFAULT_IMAGE = "/assets/default.svg";
+
+/** Returns a valid img src — falls back to default for null, undefined, or empty string. */
+const safeSrc = (url: string | null | undefined) =>
+  url && url.trim() !== "" ? url : DEFAULT_IMAGE;
+
 /* Visibility badge */
 const VisibilityBadge = ({ visibility }: { visibility: string }) => {
   const map: Record<
@@ -96,13 +102,16 @@ const MediaItem = ({
           />
         ) : (
           <Image
-            src={img.url}
+            src={safeSrc(img.url)}
             alt={img.description || `Media ${idx + 1}`}
             width={1200}
             height={800}
             className="w-full h-56 sm:h-72 object-cover"
             priority={idx === 0}
             unoptimized
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = DEFAULT_IMAGE;
+            }}
           />
         )}
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-200 flex items-end justify-end p-3">
@@ -229,10 +238,12 @@ const PreviewModal = ({
               className="max-h-[80vh] w-full"
             />
           ) : (
-            <img
-              src={img.url}
+          <img
+              src={safeSrc(img.url)}
               alt={img.description || ""}
-              onError={() => setError(true)}
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = DEFAULT_IMAGE;
+              }}
               className="max-h-[80vh] w-auto object-contain"
             />
           )}
@@ -272,8 +283,11 @@ const PreviewModal = ({
                     </div>
                   ) : (
                     <img
-                      src={im.url}
+                      src={safeSrc(im.url)}
                       alt=""
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = DEFAULT_IMAGE;
+                      }}
                       className="w-full h-full object-cover"
                     />
                   )}

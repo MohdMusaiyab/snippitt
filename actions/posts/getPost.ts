@@ -4,8 +4,8 @@
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-providers";
-import { extractKeyFromUrl, generatePresignedViewUrl } from "@/lib/aws_s3";
-import type { Post, } from "@/schemas/post";
+import { safeGetSignedUrl } from "@/lib/aws_s3";
+import type { Post } from "@/schemas/post";
 
 interface GetPostOptions {
   includeSignedUrls?: boolean;
@@ -13,7 +13,7 @@ interface GetPostOptions {
 
 export async function getPost(
   postId: string,
-  options: GetPostOptions = { includeSignedUrls: true }
+  options: GetPostOptions = { includeSignedUrls: true },
 ): Promise<{
   success: boolean;
   message: string;
@@ -44,39 +44,18 @@ export async function getPost(
     }
 
     const post = await prisma.post.findUnique({
-      where: {
-        id: postId,
-        userId: user.id,
-      },
+      where: { id: postId, userId: user.id },
       include: {
         user: {
-          select: {
-            id: true,
-            username: true,
-            avatar: true,
-          },
+          select: { id: true, username: true, avatar: true },
         },
-        images: {
-          orderBy: { createdAt: "asc" },
-        },
-        tags: {
-          include: { tag: true },
-        },
+        images: { orderBy: { createdAt: "asc" } },
+        tags: { include: { tag: true } },
         _count: {
-          select: {
-            likes: true,
-            comments: true,
-            savedBy: true,
-          },
+          select: { likes: true, comments: true, savedBy: true },
         },
-        likes: {
-          where: { userId: user.id },
-          select: { userId: true },
-        },
-        savedBy: {
-          where: { userId: user.id },
-          select: { userId: true },
-        },
+        likes: { where: { userId: user.id }, select: { userId: true } },
+        savedBy: { where: { userId: user.id }, select: { userId: true } },
       },
     });
 
@@ -88,7 +67,7 @@ export async function getPost(
       };
     }
 
-    // Transform to Post interface
+    // Build base transformed post (raw URLs first)
     const transformedPost: Post = {
       id: post.id,
       title: post.title,
@@ -103,8 +82,7 @@ export async function getPost(
         username: post.user.username,
         avatar: post.user.avatar,
       },
-      // Add images to the Post type
-      images: post.images.map(img => ({
+      images: post.images.map((img) => ({
         id: img.id,
         url: img.url,
         description: img.description,
@@ -123,64 +101,38 @@ export async function getPost(
       linkTo: `/posts/${post.id}`,
     };
 
-    // In getPost, when processing images:
-if (options.includeSignedUrls) {
-  transformedPost.images = await Promise.all(
-    post.images.map(async (img) => {
-      try {
-        // Generate signed URL for each image
-        const key = extractKeyFromUrl(img.url); // This extracts 'uploads/...' from the URL
-        const signedUrl = await generatePresignedViewUrl(key);
-        
-        return {
-          id: img.id,
-          url: signedUrl, // ← Use the signed URL
-          description: img.description,
-          isCover: img.isCover,
-          createdAt: img.createdAt,
-          updatedAt: img.updatedAt,
-        };
-      } catch (error) {
-        console.error(`Failed to sign image ${img.id}:`, error);
-        // Fall back to original URL if signing fails
-        return {
-          id: img.id,
-          url: img.url,
-          description: img.description,
-          isCover: img.isCover,
-          createdAt: img.createdAt,
-          updatedAt: img.updatedAt,
-        };
-      }
-    })
-  );
-  
-  // Also generate signed URL for cover image
-  const coverImage = post.images.find((img) => img.isCover);
-  if (coverImage) {
-    try {
-      const key = extractKeyFromUrl(coverImage.url);
-      const signedUrl = await generatePresignedViewUrl(key);
-      transformedPost.coverImage = signedUrl;
-    } catch (error) {
-      console.error("Failed to generate signed URL for cover:", error);
-      transformedPost.coverImage = coverImage.url;
+    if (options.includeSignedUrls) {
+      // Sign all image URLs and the author avatar in parallel
+      // safeGetSignedUrl handles:
+      //   • Google/GitHub OAuth avatars → returned as-is
+      //   • S3 files missing (deleted/corrupted) → returns null, never crashes
+      //   • Malformed URLs → returns null gracefully
+      const [signedAvatar, ...signedImages] = await Promise.all([
+        safeGetSignedUrl(post.user.avatar),
+        ...post.images.map(async (img) => {
+          const signedUrl = await safeGetSignedUrl(img.url);
+          return {
+            id: img.id,
+            url: signedUrl ?? img.url, // Fallback: show raw URL rather than nothing
+            description: img.description,
+            isCover: img.isCover,
+            createdAt: img.createdAt,
+            updatedAt: img.updatedAt,
+          };
+        }),
+      ]);
+
+      transformedPost.user.avatar = signedAvatar;
+      transformedPost.images = signedImages;
+
+      // Set coverImage from the already-signed images list
+      const cover = transformedPost.images.find((img) => img.isCover);
+      transformedPost.coverImage = cover?.url || null;
+    } else {
+      // No signing — find coverImage from raw DB URLs
+      const cover = post.images.find((img) => img.isCover);
+      transformedPost.coverImage = cover?.url || null;
     }
-  }
-} else {
-  // If not including signed URLs, use original URLs
-  transformedPost.images = post.images.map(img => ({
-    id: img.id,
-    url: img.url,
-    description: img.description,
-    isCover: img.isCover,
-    createdAt: img.createdAt,
-    updatedAt: img.updatedAt,
-  }));
-  
-  const coverImage = post.images.find((img) => img.isCover);
-  transformedPost.coverImage = coverImage?.url || null;
-}
 
     return {
       success: true,

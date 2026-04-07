@@ -15,6 +15,10 @@ import { env } from "@/lib/env";
 
 const DEFAULT_COVER_IMAGE = "/assets/default.svg";
 
+/** Returns the image src, falling back to the default for null, undefined, OR empty string. */
+const coverSrc = (url: string | null | undefined) =>
+  url && url.trim() !== "" ? url : DEFAULT_COVER_IMAGE;
+
 interface SnippetProps {
   post: Post;
   menuOpen: string | null;
@@ -146,10 +150,11 @@ flex flex-col sm:flex-row gap-4 sm:gap-2 p-2 group"
         {/* Thumbnail */}
         <div className="relative w-full sm:w-36 h-48 sm:h-24 rounded-lg overflow-hidden flex-shrink-0">
           <Image
-            src={post.coverImage || DEFAULT_COVER_IMAGE}
-            alt="Cover"
+            src={coverSrc(post.coverImage)}
+            alt={post.title || "Cover image"}
             fill
             className="object-cover"
+            onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_COVER_IMAGE; }}
           />
         </div>
 
@@ -229,12 +234,13 @@ flex flex-col sm:flex-row gap-4 sm:gap-2 p-2 group"
       {/* Cover Image */}
       <div className="relative w-full aspect-[16/9]">
         <Image
-          src={post.coverImage || DEFAULT_COVER_IMAGE}
-          alt="Cover"
+          src={coverSrc(post.coverImage)}
+          alt={post.title || "Cover image"}
           fill
           className="object-cover"
           priority
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_COVER_IMAGE; }}
         />
 
         {/* Floating Category Badge */}
