@@ -10,7 +10,6 @@ import React, {
 import { useParams, useRouter } from "next/navigation";
 import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
-import Image from "next/image";
 import Button from "@/app/components/Button";
 import {
   Upload,
@@ -45,6 +44,7 @@ import { getTags, checkTagExists } from "@/actions/tags";
 import { VisibilityPanel } from "../general/VisibilityPanel";
 import { MediaPreviewModal } from "./MediaPreviewModal";
 import { DeleteModal } from "../general/DeleteModal";
+import { MediaRenderer } from "../general/MediaRenderer";
 
 interface FileWithMetadata {
   id: string;
@@ -66,8 +66,8 @@ interface FileWithMetadata {
 const DEFAULT_PREVIEW_IMAGE = "/assets/default.svg";
 
 /** Safely returns a valid src for <Image>. Falls back to default placeholder for null/empty/falsy. */
-const safeSrc = (url: string | null | undefined) =>
-  url && url.trim() !== "" ? url : DEFAULT_PREVIEW_IMAGE;
+// const safeSrc = (url: string | null | undefined) =>
+//   url && url.trim() !== "" ? url : DEFAULT_PREVIEW_IMAGE;
 
 const inputBase =
   "w-full px-4 py-3 rounded-xl border bg-gray-50 focus:bg-white text-sm text-gray-900 placeholder-gray-400 outline-none transition-all";
@@ -1628,31 +1628,13 @@ const EditPostForm = () => {
                                   file.preview && file.preview.trim() !== "" ? "cursor-zoom-in" : "cursor-default"
                                 }`}
                               >
-                                {file.fileType === "image" ? (
-                                  <Image
-                                    src={safeSrc(file.preview)}
-                                    alt={file.name || "Image"}
-                                    fill
-                                    className="object-cover transition-transform duration-200 group-hover:scale-105"
-                                    unoptimized
-                                    sizes="(max-width: 640px) 100vw, 72px"
-                                    onError={(e) => {
-                                      const target = e.target as HTMLImageElement;
-                                      target.src = DEFAULT_PREVIEW_IMAGE;
-                                    }}
-                                  />
-                                ) : (
-                                  <video
-                                    src={file.preview}
-                                    className="absolute inset-0 w-full h-full object-cover"
-                                    muted
-                                    preload="metadata"
-                                    onError={(e) => {
-                                      const target = e.target as HTMLVideoElement;
-                                      target.style.display = "none";
-                                    }}
-                                  />
-                                )}
+                                <MediaRenderer
+                                  src={file.preview}
+                                  alt={file.name || "Media"}
+                                  className="w-full h-full"
+                                  interactive={true}
+                                  sizes="(max-width: 640px) 100vw, 72px"
+                                />
                                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-200 flex items-center justify-center">
                                   <Maximize2
                                     size={14}

@@ -12,12 +12,13 @@ import DeleteSnippitButton from "./DeleteSnippitButton";
 import ToggleSaveButton from "./ToggleSaveButton";
 import ShareActionButton from "./ShareActionButton";
 import { env } from "@/lib/env";
+import { MediaRenderer } from "./MediaRenderer";
 
-const DEFAULT_COVER_IMAGE = "/assets/default.svg";
+// const DEFAULT_COVER_IMAGE = "/assets/default.svg";
 
 /** Returns the image src, falling back to the default for null, undefined, OR empty string. */
-const coverSrc = (url: string | null | undefined) =>
-  url && url.trim() !== "" ? url : DEFAULT_COVER_IMAGE;
+// const coverSrc = (url: string | null | undefined) =>
+//   url && url.trim() !== "" ? url : DEFAULT_COVER_IMAGE;
 
 interface SnippetProps {
   post: Post;
@@ -148,13 +149,13 @@ flex flex-col sm:flex-row gap-4 sm:gap-2 p-2 group"
         )}
 
         {/* Thumbnail */}
-        <div className="relative w-full sm:w-36 h-48 sm:h-24 rounded-lg overflow-hidden flex-shrink-0">
-          <Image
-            src={coverSrc(post.coverImage)}
-            alt={post.title || "Cover image"}
-            fill
-            className="object-cover"
-            onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_COVER_IMAGE; }}
+        <div className="w-full sm:w-36 h-48 sm:h-24 rounded-lg overflow-hidden flex-shrink-0">
+          <MediaRenderer
+            src={post.coverImage}
+            alt={post.title || "Cover"}
+            className="w-full h-full"
+            interactive={true}
+            sizes="(max-width: 640px) 100vw, 150px"
           />
         </div>
 
@@ -233,14 +234,13 @@ flex flex-col sm:flex-row gap-4 sm:gap-2 p-2 group"
     >
       {/* Cover Image */}
       <div className="relative w-full aspect-[16/9]">
-        <Image
-          src={coverSrc(post.coverImage)}
-          alt={post.title || "Cover image"}
-          fill
-          className="object-cover"
-          priority
+        <MediaRenderer
+          src={post.coverImage}
+          alt={post.title || "Cover"}
+          className="w-full h-full"
+          priority={true}
+          interactive={true}
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-          onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_COVER_IMAGE; }}
         />
 
         {/* Floating Category Badge */}

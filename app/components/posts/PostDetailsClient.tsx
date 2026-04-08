@@ -4,11 +4,9 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { format } from "date-fns";
-import { useRouter } from "next/navigation";
 import {
   Calendar,
   MessageCircle,
-  ArrowLeft,
   Ellipsis,
   Edit2,
   Globe,
@@ -19,7 +17,6 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  Video,
   Image as ImageIcon,
   RefreshCw,
 } from "lucide-react";
@@ -30,13 +27,12 @@ import CommentSection from "../comment/CommentSection";
 import AddCollectionButton from "../general/AddCollectionButton";
 import DeleteSnippitButton from "../general/DeleteSnippitButton";
 import ShareActionButton from "../general/ShareActionButton";
+import { MediaRenderer } from "../general/MediaRenderer";
 import { env } from "@/lib/env";
 
-const DEFAULT_IMAGE = "/assets/default.svg";
+import { isVideoUrl } from "@/lib/aws_s3";
 
-/** Returns a valid img src — falls back to default for null, undefined, or empty string. */
-const safeSrc = (url: string | null | undefined) =>
-  url && url.trim() !== "" ? url : DEFAULT_IMAGE;
+const DEFAULT_IMAGE = "/assets/default.svg";
 
 /* Visibility badge */
 const VisibilityBadge = ({ visibility }: { visibility: string }) => {
@@ -86,47 +82,24 @@ const MediaItem = ({
   idx: number;
   onExpand: (idx: number) => void;
 }) => {
-  const isVideo = img.url?.match(/\.(mp4|webm|avi|mov)$/i);
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <div
         onClick={() => onExpand(idx)}
         className="relative w-full overflow-hidden bg-gray-50 cursor-zoom-in group"
       >
-        {isVideo ? (
-          <video
-            src={img.url}
-            muted
-            preload="metadata"
-            className="w-full h-56 sm:h-72 object-cover"
-          />
-        ) : (
-          <Image
-            src={safeSrc(img.url)}
-            alt={img.description || `Media ${idx + 1}`}
-            width={1200}
-            height={800}
-            className="w-full h-56 sm:h-72 object-cover"
-            priority={idx === 0}
-            unoptimized
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = DEFAULT_IMAGE;
-            }}
-          />
-        )}
+        <MediaRenderer
+          src={img.url}
+          alt={img.description || `Media ${idx + 1}`}
+          className="w-full h-56 sm:h-72"
+          interactive={true}
+          priority={idx === 0}
+        />
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-200 flex items-end justify-end p-3">
           <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 backdrop-blur-sm rounded-xl p-2">
             <Maximize2 size={14} className="text-white" />
           </div>
         </div>
-        {isVideo && (
-          <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-sm rounded-lg px-2 py-1 flex items-center gap-1.5">
-            <Video size={11} className="text-white" />
-            <span className="text-[10px] font-bold text-white uppercase tracking-wide">
-              Video
-            </span>
-          </div>
-        )}
         <div className="absolute top-3 right-3 bg-black/40 backdrop-blur-sm rounded-lg px-2 py-1">
           <span className="text-[10px] font-bold text-white/80 tabular-nums">
             {idx + 1}
@@ -184,7 +157,6 @@ const PreviewModal = ({
   }, [onClose, prev, next]);
 
   const img = images[current];
-  const isVideo = img?.url?.match(/\.(mp4|webm|avi|mov)$/i);
 
   return (
     <div
@@ -229,22 +201,13 @@ const PreviewModal = ({
                 <RefreshCw size={11} /> Try again
               </button>
             </div>
-          ) : isVideo ? (
-            <video
-              src={img.url}
-              controls
-              autoPlay
-              onError={() => setError(true)}
-              className="max-h-[80vh] w-full"
-            />
           ) : (
-          <img
-              src={safeSrc(img.url)}
+            <MediaRenderer
+              src={img.url}
               alt={img.description || ""}
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = DEFAULT_IMAGE;
-              }}
-              className="max-h-[80vh] w-auto object-contain"
+              className="max-h-[80vh] w-full"
+              objectFit="contain"
+              controls={true}
             />
           )}
           {images.length > 1 && (
@@ -267,7 +230,6 @@ const PreviewModal = ({
         {images.length > 1 && (
           <div className="flex gap-2 overflow-x-auto pb-1 justify-center">
             {images.map((im, i) => {
-              const iv = im.url?.match(/\.(mp4|webm|avi|mov)$/i);
               return (
                 <button
                   key={im.id || i}
@@ -277,20 +239,13 @@ const PreviewModal = ({
                   }}
                   className={`relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all ${i === current ? "border-white" : "border-transparent opacity-50 hover:opacity-80"}`}
                 >
-                  {iv ? (
-                    <div className="w-full h-full bg-gray-800 flex items-center justify-center">
-                      <Video size={14} className="text-white/60" />
-                    </div>
-                  ) : (
-                    <img
-                      src={safeSrc(im.url)}
-                      alt=""
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = DEFAULT_IMAGE;
-                      }}
-                      className="w-full h-full object-cover"
-                    />
-                  )}
+                  <MediaRenderer
+                    src={im.url}
+                    alt=""
+                    className="w-full h-full"
+                    interactive={false}
+                    showIcon={false}
+                  />
                 </button>
               );
             })}
@@ -302,7 +257,6 @@ const PreviewModal = ({
 };
 
 const PostDetailClient = ({ post, currentUserId }: any) => {
-  const router = useRouter();
   const [commentCount, setCommentCount] = useState<number>(
     post._count.comments || 0,
   );
