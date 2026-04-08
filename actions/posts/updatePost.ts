@@ -9,10 +9,8 @@ import type { Post } from "@/schemas/post";
 import { Category, Visibility } from "@/app/generated/prisma/enums";
 import {
   processUploadLink,
-  safeExtractKey,
   moveFileToTrash,
   safeGetSignedUrl,
-  sanitizeS3Url,
 } from "@/lib/aws_s3";
 
 // Schema for image data in update
