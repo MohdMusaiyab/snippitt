@@ -90,6 +90,27 @@ export function sanitizeS3Url(url: string | null | undefined): string {
 }
 
 /**
+ * Checks if a URL points to a video file based on common extensions.
+ */
+export function isVideoUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  return /\.(mp4|webm|mov|avi|mkv|3gp)$/i.test(url.split(/[?#]/)[0]);
+}
+
+/**
+ * Returns a URL optimized for the MediaRenderer.
+ * For videos, it appends #t=0.1 to help browsers render the first frame as a thumbnail.
+ */
+export function getMediaUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const isVideo = isVideoUrl(url);
+  if (isVideo && !url.includes("#t=")) {
+    return `${url}#t=0.1`;
+  }
+  return url;
+}
+
+/**
  * Safely extracts an S3 key from a full URL.
  * Returns null if the URL is malformed or cannot be parsed.
  * Prefer this over extractKeyFromUrl() wherever a crash is unacceptable.
