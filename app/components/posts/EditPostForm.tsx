@@ -10,6 +10,7 @@ import React, {
 import { useParams, useRouter } from "next/navigation";
 import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
+import Image from "next/image";
 import Button from "@/app/components/Button";
 import {
   Upload,
@@ -44,7 +45,60 @@ import { getTags, checkTagExists } from "@/actions/tags";
 import { VisibilityPanel } from "../general/VisibilityPanel";
 import { MediaPreviewModal } from "./MediaPreviewModal";
 import { DeleteModal } from "../general/DeleteModal";
-import { MediaRenderer } from "../general/MediaRenderer";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NEW: Helper function to detect video from signed URL (without breaking existing logic)
+// ─────────────────────────────────────────────────────────────────────────────
+const isVideoUrl = (url: string | null | undefined): boolean => {
+  if (!url) return false;
+  // Strip query parameters (X-Amz-Signature, etc.) to get clean filename
+  const cleanUrl = url.split("?")[0];
+  return /\.(mp4|webm|avi|mov|mkv|flv)$/i.test(cleanUrl);
+};
+
+// NEW: Video component with loading state (doesn't affect existing logic)
+const VideoThumbnail = ({
+  src,
+  className,
+}: {
+  src: string;
+  className?: string;
+}) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError || !src) {
+    return (
+      <div
+        className={`${className} bg-gray-100 flex flex-col items-center justify-center gap-1`}
+      >
+        <Video size={16} className="text-gray-400" />
+        <span className="text-[10px] text-gray-400">Video unavailable</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full h-full">
+      {isLoading && (
+        <div className="absolute inset-0 bg-gray-100 flex items-center justify-center z-10">
+          <Loader2 size={16} className="animate-spin text-gray-400" />
+        </div>
+      )}
+      <video
+        src={src}
+        muted
+        preload="metadata"
+        className={`${className} ${isLoading ? "opacity-0" : "opacity-100"} transition-opacity duration-200`}
+        onLoadedData={() => setIsLoading(false)}
+        onError={() => {
+          setHasError(true);
+          setIsLoading(false);
+        }}
+      />
+    </div>
+  );
+};
 
 interface FileWithMetadata {
   id: string;
@@ -66,8 +120,8 @@ interface FileWithMetadata {
 const DEFAULT_PREVIEW_IMAGE = "/assets/default.svg";
 
 /** Safely returns a valid src for <Image>. Falls back to default placeholder for null/empty/falsy. */
-// const safeSrc = (url: string | null | undefined) =>
-//   url && url.trim() !== "" ? url : DEFAULT_PREVIEW_IMAGE;
+const safeSrc = (url: string | null | undefined) =>
+  url && url.trim() !== "" ? url : DEFAULT_PREVIEW_IMAGE;
 
 const inputBase =
   "w-full px-4 py-3 rounded-xl border bg-gray-50 focus:bg-white text-sm text-gray-900 placeholder-gray-400 outline-none transition-all";
@@ -272,6 +326,9 @@ const EditPostForm = () => {
               const extractedName =
                 rawName.split("-").slice(3).join("-") || rawName;
 
+              // FIXED: Better video detection using the helper that handles signed URLs
+              const isVideo = isVideoUrl(img.url);
+
               return {
                 id: img.id || `existing-${i}`,
                 name: extractedName,
@@ -282,9 +339,7 @@ const EditPostForm = () => {
                 isUploaded: true,
                 s3Url: img.url,
                 isCover: img.isCover || false,
-                fileType: img.url.match(/\.(mp4|webm|avi|mov)$/i)
-                  ? "video"
-                  : "image",
+                fileType: isVideo ? "video" : "image",
                 existingImageId: img.id,
                 retryCount: 0,
               };
@@ -315,7 +370,8 @@ const EditPostForm = () => {
       );
       if (hasPendingUploads) {
         e.preventDefault();
-        e.returnValue = "You have pending uploads. Are you sure you want to leave?";
+        e.returnValue =
+          "You have pending uploads. Are you sure you want to leave?";
       }
     };
 
@@ -323,7 +379,7 @@ const EditPostForm = () => {
 
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      
+
       // Abort all ongoing uploads
       abortControllersRef.current.forEach((controller, id) => {
         controller.abort();
@@ -452,7 +508,9 @@ const EditPostForm = () => {
             if (xhr.status === 200) {
               // Validate that we received the file metadata
               if (!fileUrl || !key) {
-                reject(new Error("S3 returned success but missing file metadata"));
+                reject(
+                  new Error("S3 returned success but missing file metadata"),
+                );
                 return;
               }
               resolve();
@@ -551,13 +609,16 @@ const EditPostForm = () => {
       }
 
       throw new Error(
-        lastError?.message || `Failed to upload ${fd.name} after ${MAX_RETRIES} attempts`,
+        lastError?.message ||
+          `Failed to upload ${fd.name} after ${MAX_RETRIES} attempts`,
       );
     },
     [uploadSingleFile],
   );
 
-  const uploadFiles = useCallback(async (): Promise<FileWithMetadata[] | null> => {
+  const uploadFiles = useCallback(async (): Promise<
+    FileWithMetadata[] | null
+  > => {
     // Prevent concurrent uploads
     if (isUploadingRef.current) {
       toast.warning("Upload already in progress");
@@ -623,16 +684,21 @@ const EditPostForm = () => {
           { id: uploadToast, duration: 5000 },
         );
       } else {
-        toast.error(`All ${pending.length} uploads failed. Please check your connection and try again.`, {
-          id: uploadToast,
-          duration: 5000,
-        });
+        toast.error(
+          `All ${pending.length} uploads failed. Please check your connection and try again.`,
+          {
+            id: uploadToast,
+            duration: 5000,
+          },
+        );
       }
 
       return finalFiles;
     } catch (error: any) {
       console.error("Upload batch error:", error);
-      toast.error("Upload system error. Please try again.", { id: uploadToast });
+      toast.error("Upload system error. Please try again.", {
+        id: uploadToast,
+      });
       return null;
     } finally {
       setIsUploading(false);
@@ -659,11 +725,9 @@ const EditPostForm = () => {
           ...fileToRetry,
           retryCount: 0,
         });
-        
-        setFiles((prev) =>
-          prev.map((f) => (f.id === fileId ? result : f)),
-        );
-        
+
+        setFiles((prev) => prev.map((f) => (f.id === fileId ? result : f)));
+
         toast.success(`Successfully uploaded ${fileToRetry.name}`);
       } catch (error: any) {
         toast.error(`Failed to upload ${fileToRetry.name}: ${error.message}`);
@@ -758,16 +822,16 @@ const EditPostForm = () => {
     setFiles((prev) => {
       const next = [...prev];
       const removed = next.splice(index, 1)[0];
-      
+
       // Abort upload if in progress
       if (!removed.isUploaded && abortControllersRef.current.has(removed.id)) {
         abortControllersRef.current.get(removed.id)?.abort();
         abortControllersRef.current.delete(removed.id);
       }
-      
+
       if (!removed.isUploaded && removed.preview.startsWith("blob:"))
         URL.revokeObjectURL(removed.preview);
-        
+
       if (removed.isCover) {
         const fi = next.findIndex((f) => f.fileType === "image");
         if (fi !== -1) {
@@ -854,24 +918,28 @@ const EditPostForm = () => {
 
     let currentFilesForSubmit = files;
     const pending = files.filter((f) => !f.isUploaded && f.file !== null);
-    
+
     if (pending.length) {
       const confirmed = await confirmUpload(pending.length);
       if (!confirmed) return;
-      
+
       const uploadedFiles = await uploadFiles();
       if (!uploadedFiles) {
-        toast.error("Some uploads failed. Please retry failed files before saving.");
+        toast.error(
+          "Some uploads failed. Please retry failed files before saving.",
+        );
         return;
       }
-      
+
       // Check again for any failed uploads after batch upload
       const stillFailed = uploadedFiles.filter((f) => f.uploadError);
       if (stillFailed.length > 0) {
-        toast.error(`${stillFailed.length} file(s) still failed. Please retry them individually.`);
+        toast.error(
+          `${stillFailed.length} file(s) still failed. Please retry them individually.`,
+        );
         return;
       }
-      
+
       currentFilesForSubmit = uploadedFiles;
     }
 
@@ -881,12 +949,12 @@ const EditPostForm = () => {
       const autoSet = window.confirm(
         "No cover image selected. Would you like to automatically set the first image as cover?",
       );
-      
+
       if (!autoSet) {
         toast.error("Please select a cover image before submitting");
         return;
       }
-      
+
       const firstImageIndex = currentFilesForSubmit.findIndex(
         (f) => f.fileType === "image",
       );
@@ -906,7 +974,7 @@ const EditPostForm = () => {
       const invalidFiles = currentFilesForSubmit.filter(
         (f) => f.isUploaded && !f.s3Url && !f.existingImageId,
       );
-      
+
       if (invalidFiles.length > 0) {
         toast.error(
           `${invalidFiles.length} file(s) are missing upload data. Please remove and re-upload them.`,
@@ -945,22 +1013,23 @@ const EditPostForm = () => {
         const updatedPost = result.data;
         if (updatedPost.images) {
           setFiles(
-            updatedPost.images.map((img) => ({
-              id: img.id,
-              name: img.url.split("/").pop() || "image",
-              file: null,
-              preview: img.url,
-              description: img.description || "",
-              uploadProgress: 100,
-              isUploaded: true,
-              s3Url: img.url,
-              isCover: img.isCover || false,
-              fileType: img.url.match(/\.(mp4|webm|avi|mov)$/i)
-                ? "video"
-                : "image",
-              existingImageId: img.id,
-              retryCount: 0,
-            })),
+            updatedPost.images.map((img) => {
+              const isVideo = isVideoUrl(img.url);
+              return {
+                id: img.id,
+                name: img.url.split("/").pop() || "image",
+                file: null,
+                preview: img.url,
+                description: img.description || "",
+                uploadProgress: 100,
+                isUploaded: true,
+                s3Url: img.url,
+                isCover: img.isCover || false,
+                fileType: isVideo ? "video" : "image",
+                existingImageId: img.id,
+                retryCount: 0,
+              };
+            }),
           );
         }
 
@@ -1293,7 +1362,8 @@ const EditPostForm = () => {
                             !isCheckingTag &&
                             !formData.tags.some(
                               (t) =>
-                                t.toLowerCase() === tagSearch.trim().toLowerCase(),
+                                t.toLowerCase() ===
+                                tagSearch.trim().toLowerCase(),
                             ) && (
                               <button
                                 type="button"
@@ -1592,8 +1662,8 @@ const EditPostForm = () => {
             file.isCover
               ? "border-indigo-200 bg-gradient-to-br from-indigo-50/60 to-white shadow-sm shadow-indigo-100"
               : file.uploadError
-              ? "border-red-200 bg-red-50/30"
-              : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
+                ? "border-red-200 bg-red-50/30"
+                : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
           }`}
                           >
                             {/* Cover badge strip */}
@@ -1610,12 +1680,13 @@ const EditPostForm = () => {
                             )}
 
                             <div className="flex flex-col sm:flex-row items-start gap-3 p-4">
-                              {/* Thumbnail */}
+                              {/* Thumbnail - FIXED: Better video handling */}
                               <div
                                 onClick={() => {
-                                  const src = file.preview && file.preview.trim() !== ""
-                                    ? file.preview
-                                    : null;
+                                  const src =
+                                    file.preview && file.preview.trim() !== ""
+                                      ? file.preview
+                                      : null;
                                   if (!src) return;
                                   setPreviewFile({
                                     src,
@@ -1625,16 +1696,32 @@ const EditPostForm = () => {
                                   setPreviewError(false);
                                 }}
                                 className={`relative w-full sm:w-[72px] h-48 sm:h-[72px] rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 shadow-sm group ${
-                                  file.preview && file.preview.trim() !== "" ? "cursor-zoom-in" : "cursor-default"
+                                  file.preview && file.preview.trim() !== ""
+                                    ? "cursor-zoom-in"
+                                    : "cursor-default"
                                 }`}
                               >
-                                <MediaRenderer
-                                  src={file.preview}
-                                  alt={file.name || "Media"}
-                                  className="w-full h-full"
-                                  interactive={true}
-                                  sizes="(max-width: 640px) 100vw, 72px"
-                                />
+                                {file.fileType === "image" ? (
+                                  <Image
+                                    src={safeSrc(file.preview)}
+                                    alt={file.name || "Image"}
+                                    fill
+                                    className="object-cover transition-transform duration-200 group-hover:scale-105"
+                                    unoptimized
+                                    sizes="(max-width: 640px) 100vw, 72px"
+                                    onError={(e) => {
+                                      const target =
+                                        e.target as HTMLImageElement;
+                                      target.src = DEFAULT_PREVIEW_IMAGE;
+                                    }}
+                                  />
+                                ) : (
+                                  // FIXED: Use VideoThumbnail component for better UX
+                                  <VideoThumbnail
+                                    src={file.preview}
+                                    className="absolute inset-0 w-full h-full object-cover"
+                                  />
+                                )}
                                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-200 flex items-center justify-center">
                                   <Maximize2
                                     size={14}
@@ -1687,7 +1774,9 @@ const EditPostForm = () => {
                                     )}
                                     {file.uploadError && !file.isUploaded && (
                                       <button
-                                        onClick={() => retryFailedUpload(file.id)}
+                                        onClick={() =>
+                                          retryFailedUpload(file.id)
+                                        }
                                         disabled={isSubmitting || isUploading}
                                         className="p-1.5 text-amber-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
                                         title="Retry upload"
@@ -1706,30 +1795,32 @@ const EditPostForm = () => {
                                 </div>
 
                                 {/* Upload progress */}
-                                {!file.isUploaded && !file.uploadError && isUploading && (
-                                  <div className="space-y-1">
-                                    <div className="flex justify-between text-[10px] font-medium text-gray-400">
-                                      <span className="flex items-center gap-1">
-                                        <Loader2
-                                          size={9}
-                                          className="animate-spin"
+                                {!file.isUploaded &&
+                                  !file.uploadError &&
+                                  isUploading && (
+                                    <div className="space-y-1">
+                                      <div className="flex justify-between text-[10px] font-medium text-gray-400">
+                                        <span className="flex items-center gap-1">
+                                          <Loader2
+                                            size={9}
+                                            className="animate-spin"
+                                          />
+                                          Uploading
+                                        </span>
+                                        <span className="tabular-nums text-indigo-500">
+                                          {file.uploadProgress}%
+                                        </span>
+                                      </div>
+                                      <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                                        <div
+                                          className="h-full bg-gradient-to-r from-indigo-500 to-indigo-400 rounded-full transition-all duration-300"
+                                          style={{
+                                            width: `${file.uploadProgress}%`,
+                                          }}
                                         />
-                                        Uploading
-                                      </span>
-                                      <span className="tabular-nums text-indigo-500">
-                                        {file.uploadProgress}%
-                                      </span>
+                                      </div>
                                     </div>
-                                    <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
-                                      <div
-                                        className="h-full bg-gradient-to-r from-indigo-500 to-indigo-400 rounded-full transition-all duration-300"
-                                        style={{
-                                          width: `${file.uploadProgress}%`,
-                                        }}
-                                      />
-                                    </div>
-                                  </div>
-                                )}
+                                  )}
 
                                 {/* Error message */}
                                 {file.uploadError && !file.isUploaded && (
