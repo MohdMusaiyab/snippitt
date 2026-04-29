@@ -33,6 +33,7 @@ import {
   Tag,
   ChevronDown,
   Maximize2,
+  RefreshCw,
 } from "lucide-react";
 import { getPost } from "@/actions/posts/getPost";
 import { deletePost } from "@/actions/posts/deletePost";
@@ -44,6 +45,60 @@ import { getTags, checkTagExists } from "@/actions/tags";
 import { VisibilityPanel } from "../general/VisibilityPanel";
 import { MediaPreviewModal } from "./MediaPreviewModal";
 import { DeleteModal } from "../general/DeleteModal";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NEW: Helper function to detect video from signed URL (without breaking existing logic)
+// ─────────────────────────────────────────────────────────────────────────────
+const isVideoUrl = (url: string | null | undefined): boolean => {
+  if (!url) return false;
+  // Strip query parameters (X-Amz-Signature, etc.) to get clean filename
+  const cleanUrl = url.split("?")[0];
+  return /\.(mp4|webm|avi|mov|mkv|flv)$/i.test(cleanUrl);
+};
+
+// NEW: Video component with loading state (doesn't affect existing logic)
+const VideoThumbnail = ({
+  src,
+  className,
+}: {
+  src: string;
+  className?: string;
+}) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError || !src) {
+    return (
+      <div
+        className={`${className} bg-gray-100 flex flex-col items-center justify-center gap-1`}
+      >
+        <Video size={16} className="text-gray-400" />
+        <span className="text-[10px] text-gray-400">Video unavailable</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full h-full">
+      {isLoading && (
+        <div className="absolute inset-0 bg-gray-100 flex items-center justify-center z-10">
+          <Loader2 size={16} className="animate-spin text-gray-400" />
+        </div>
+      )}
+      <video
+        src={src}
+        muted
+        preload="metadata"
+        className={`${className} ${isLoading ? "opacity-0" : "opacity-100"} transition-opacity duration-200`}
+        onLoadedData={() => setIsLoading(false)}
+        onError={() => {
+          setHasError(true);
+          setIsLoading(false);
+        }}
+      />
+    </div>
+  );
+};
 
 interface FileWithMetadata {
   id: string;
@@ -58,7 +113,15 @@ interface FileWithMetadata {
   isCover: boolean;
   fileType: "image" | "video";
   existingImageId?: string;
+  uploadError?: string;
+  retryCount: number;
 }
+
+const DEFAULT_PREVIEW_IMAGE = "/assets/default.svg";
+
+/** Safely returns a valid src for <Image>. Falls back to default placeholder for null/empty/falsy. */
+const safeSrc = (url: string | null | undefined) =>
+  url && url.trim() !== "" ? url : DEFAULT_PREVIEW_IMAGE;
 
 const inputBase =
   "w-full px-4 py-3 rounded-xl border bg-gray-50 focus:bg-white text-sm text-gray-900 placeholder-gray-400 outline-none transition-all";
@@ -100,6 +163,8 @@ const Field = ({
 
 const MAX_SIZE_MB = 10;
 const MAX_FILES = 10;
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 1000;
 
 const EditPostForm = () => {
   const params = useParams();
@@ -116,8 +181,6 @@ const EditPostForm = () => {
   const [post, setPost] = useState<Post | null>(null);
   const [files, setFiles] = useState<FileWithMetadata[]>([]);
   const [viewMode, setViewMode] = useState<"details" | "media">("media");
-  const [selectedVisibility, setSelectedVisibility] =
-    useState<Visibility>("PRIVATE");
 
   const [formData, setFormData] = useState({
     title: "",
@@ -154,6 +217,12 @@ const EditPostForm = () => {
     resolve: (value: boolean) => void;
   } | null>(null);
 
+  // Refs for preventing race conditions and cleanup
+  const isUploadingRef = useRef(false);
+  const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+  const tagSearchAbortRef = useRef<AbortController | null>(null);
+  const filesRef = useRef(files);
+
   const confirmUpload = (count: number): Promise<boolean> =>
     new Promise((resolve) => setPendingConfirm({ count, resolve }));
 
@@ -171,23 +240,40 @@ const EditPostForm = () => {
       return;
     }
 
-    // Mark as checking immediately — before the debounce fires
+    // Cancel previous request
+    if (tagSearchAbortRef.current) {
+      tagSearchAbortRef.current.abort();
+    }
+
+    tagSearchAbortRef.current = new AbortController();
     setIsCheckingTag(true);
-    setIsTagInDb(false); // reset stale result
+    setIsTagInDb(false);
 
     const delayDebounceFn = setTimeout(async () => {
-      const capturedSearch = tagSearch.trim(); // capture for closure safety
-      const { exists } = await checkTagExists(capturedSearch);
-
-      // Only update if tagSearch hasn't changed since this check started
-      setIsTagInDb(exists);
-      setIsCheckingTag(false);
+      const capturedSearch = tagSearch.trim();
+      try {
+        const { exists } = await checkTagExists(capturedSearch);
+        // Only update if the search hasn't changed
+        if (tagSearch.trim() === capturedSearch) {
+          setIsTagInDb(exists);
+        }
+      } catch (error: any) {
+        if (error.name !== "AbortError") {
+          console.error("Tag check failed:", error);
+        }
+      } finally {
+        if (tagSearch.trim() === capturedSearch) {
+          setIsCheckingTag(false);
+        }
+      }
     }, 300);
 
     return () => {
       clearTimeout(delayDebounceFn);
-      // Don't reset isCheckingTag here — the cleanup fires on every keystroke
-      // and would immediately hide the pending state
+      if (tagSearchAbortRef.current) {
+        tagSearchAbortRef.current.abort();
+        tagSearchAbortRef.current = null;
+      }
     };
   }, [tagSearch]);
 
@@ -232,7 +318,6 @@ const EditPostForm = () => {
             isDraft: d.isDraft ?? false,
             visibility: d.visibility ?? "PRIVATE",
           });
-          setSelectedVisibility(d.visibility || "PRIVATE");
 
           setFiles(
             d.images.map((img: any, i: number) => {
@@ -240,6 +325,9 @@ const EditPostForm = () => {
                 img.url.split("?")[0].split("/").pop() || `file-${i + 1}`;
               const extractedName =
                 rawName.split("-").slice(3).join("-") || rawName;
+
+              // FIXED: Better video detection using the helper that handles signed URLs
+              const isVideo = isVideoUrl(img.url);
 
               return {
                 id: img.id || `existing-${i}`,
@@ -251,10 +339,9 @@ const EditPostForm = () => {
                 isUploaded: true,
                 s3Url: img.url,
                 isCover: img.isCover || false,
-                fileType: img.url.match(/\.(mp4|webm|avi|mov)$/i)
-                  ? "video"
-                  : "image",
+                fileType: isVideo ? "video" : "image",
                 existingImageId: img.id,
+                retryCount: 0,
               };
             }),
           );
@@ -271,25 +358,42 @@ const EditPostForm = () => {
     })();
   }, [postId, router]);
 
-  /* cleanup blob URLs on unmount */
+  /* cleanup blob URLs and abort uploads on unmount */
   useEffect(() => {
-    return () => {
-      files.forEach((f) => {
-        if (f.preview.startsWith("blob:")) URL.revokeObjectURL(f.preview);
-      });
-    };
+    filesRef.current = files;
   }, [files]);
 
-  /* ── derived ── */
-  const stats = useMemo(
-    () => ({
-      total: files.length,
-      uploaded: files.filter((f) => f.isUploaded).length,
-      images: files.filter((f) => f.fileType === "image").length,
-      videos: files.filter((f) => f.fileType === "video").length,
-    }),
-    [files],
-  );
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      const hasPendingUploads = filesRef.current.some(
+        (f) => !f.isUploaded && f.file !== null,
+      );
+      if (hasPendingUploads) {
+        e.preventDefault();
+        e.returnValue =
+          "You have pending uploads. Are you sure you want to leave?";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+
+      // Abort all ongoing uploads
+      abortControllersRef.current.forEach((controller, id) => {
+        controller.abort();
+        abortControllersRef.current.delete(id);
+      });
+
+      // Revoke all blob URLs
+      filesRef.current.forEach((f) => {
+        if (f.preview.startsWith("blob:")) {
+          URL.revokeObjectURL(f.preview);
+        }
+      });
+    };
+  }, []);
 
   /* ── file helpers ── */
   const detectFileType = useCallback(
@@ -300,14 +404,13 @@ const EditPostForm = () => {
 
   const onDrop = useCallback(
     (accepted: File[], rejected: any[]) => {
-      // 1. Add rejected array here
-      // Handle manual limit for total files
+      // Handle limit for total files
       if (files.length + accepted.length > MAX_FILES) {
         toast.error(`Maximum ${MAX_FILES} files allowed`);
         return;
       }
 
-      // 2. Handle automatic rejections (Size or Type)
+      // Handle automatic rejections (Size or Type)
       if (rejected.length > 0) {
         rejected.forEach(({ file, errors }) => {
           errors.forEach((err: any) => {
@@ -321,8 +424,7 @@ const EditPostForm = () => {
         });
       }
 
-      // 3. Process the valid files
-      // acception only first image as cover if multiple files are added at once
+      // Process valid files
       const newFiles = accepted.map((f, i) => ({
         id: `new-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         name: f.name,
@@ -333,6 +435,7 @@ const EditPostForm = () => {
         isUploaded: false,
         isCover: files.length === 0 && i === 0 && detectFileType(f) === "image",
         fileType: detectFileType(f),
+        retryCount: 0,
       }));
 
       if (newFiles.length > 0) {
@@ -358,6 +461,280 @@ const EditPostForm = () => {
     multiple: true,
     maxSize: MAX_SIZE_MB * 1024 * 1024,
   });
+
+  const uploadSingleFile = useCallback(
+    async (
+      fd: FileWithMetadata,
+      retryAttempt = 0,
+    ): Promise<FileWithMetadata> => {
+      // Create abort controller for this upload
+      const abortController = new AbortController();
+      abortControllersRef.current.set(fd.id, abortController);
+
+      try {
+        // Get presigned URL
+        const r = await generatePresignedUrlAction({
+          fileName: fd.file!.name,
+          fileType: fd.file!.type,
+        });
+
+        if (!r.success || !r.data) {
+          throw new Error(r.message || "Failed to get upload URL");
+        }
+
+        const { uploadUrl, key, fileUrl } = r.data;
+
+        // Upload with XHR for progress tracking
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("PUT", uploadUrl, true);
+          xhr.setRequestHeader("Content-Type", fd.file!.type);
+
+          // Set timeout for slow uploads (5 minutes)
+          xhr.timeout = 5 * 60 * 1000;
+
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              const progress = Math.round((e.loaded / e.total) * 100);
+              setFiles((prev) =>
+                prev.map((f) =>
+                  f.id === fd.id ? { ...f, uploadProgress: progress } : f,
+                ),
+              );
+            }
+          };
+
+          xhr.onload = () => {
+            if (xhr.status === 200) {
+              // Validate that we received the file metadata
+              if (!fileUrl || !key) {
+                reject(
+                  new Error("S3 returned success but missing file metadata"),
+                );
+                return;
+              }
+              resolve();
+            } else {
+              reject(new Error(`Upload failed with status ${xhr.status}`));
+            }
+          };
+
+          xhr.onerror = () => reject(new Error("Network error"));
+          xhr.ontimeout = () => reject(new Error("Upload timeout"));
+
+          // Connect abort controller
+          abortController.signal.addEventListener("abort", () => {
+            xhr.abort();
+            reject(new Error("Upload cancelled"));
+          });
+
+          xhr.send(fd.file!);
+        });
+
+        // Return updated file metadata
+        return {
+          ...fd,
+          isUploaded: true,
+          s3Key: key,
+          s3Url: fileUrl,
+          uploadProgress: 100,
+          uploadError: undefined,
+          retryCount: retryAttempt,
+        };
+      } catch (error: any) {
+        // Don't treat abort as error for retry purposes
+        if (error.message === "Upload cancelled") {
+          throw error;
+        }
+
+        // Update error state
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === fd.id
+              ? {
+                  ...f,
+                  uploadError: error.message || "Upload failed",
+                  uploadProgress: 0,
+                }
+              : f,
+          ),
+        );
+
+        throw error;
+      } finally {
+        abortControllersRef.current.delete(fd.id);
+      }
+    },
+    [],
+  );
+
+  const uploadWithRetry = useCallback(
+    async (fd: FileWithMetadata): Promise<FileWithMetadata> => {
+      let lastError: Error | null = null;
+      const currentRetry = fd.retryCount;
+
+      for (let attempt = currentRetry; attempt < MAX_RETRIES; attempt++) {
+        try {
+          // Update retry count
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.id === fd.id ? { ...f, retryCount: attempt } : f,
+            ),
+          );
+
+          const result = await uploadSingleFile(fd, attempt);
+          return result;
+        } catch (error: any) {
+          lastError = error;
+
+          // Don't retry if cancelled
+          if (error.message === "Upload cancelled") {
+            throw error;
+          }
+
+          // Show retry notification for first failure
+          if (attempt === 0) {
+            toast.error(
+              `Upload failed for ${fd.name}. Retrying... (${MAX_RETRIES - 1} attempts left)`,
+            );
+          }
+
+          // Wait before retry (exponential backoff)
+          if (attempt < MAX_RETRIES - 1) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, RETRY_DELAY_MS * Math.pow(2, attempt)),
+            );
+          }
+        }
+      }
+
+      throw new Error(
+        lastError?.message ||
+          `Failed to upload ${fd.name} after ${MAX_RETRIES} attempts`,
+      );
+    },
+    [uploadSingleFile],
+  );
+
+  const uploadFiles = useCallback(async (): Promise<
+    FileWithMetadata[] | null
+  > => {
+    // Prevent concurrent uploads
+    if (isUploadingRef.current) {
+      toast.warning("Upload already in progress");
+      return null;
+    }
+
+    const pending = files.filter((f) => !f.isUploaded && f.file !== null);
+    if (!pending.length) return files;
+
+    setIsUploading(true);
+    isUploadingRef.current = true;
+
+    // Show toast for upload start
+    const uploadToast = toast.loading(`Uploading ${pending.length} file(s)...`);
+
+    try {
+      // Upload files in parallel with individual retry handling
+      const uploadResults = await Promise.allSettled(
+        pending.map((fd) => uploadWithRetry(fd)),
+      );
+
+      const successful: FileWithMetadata[] = [];
+      const failed: { file: FileWithMetadata; error: any }[] = [];
+
+      uploadResults.forEach((result, index) => {
+        if (result.status === "fulfilled") {
+          successful.push(result.value);
+        } else {
+          failed.push({
+            file: pending[index],
+            error: result.reason,
+          });
+        }
+      });
+
+      // Merge results back into file list
+      const finalFiles = files.map((f) => {
+        const uploaded = successful.find((uf) => uf.id === f.id);
+        if (uploaded) return uploaded;
+
+        const failedFile = failed.find((ff) => ff.file.id === f.id);
+        if (failedFile) {
+          return {
+            ...f,
+            uploadError: failedFile.error.message,
+            uploadProgress: 0,
+          };
+        }
+
+        return f;
+      });
+
+      setFiles(finalFiles);
+
+      // Show summary toast
+      if (successful.length === pending.length) {
+        toast.success(`Successfully uploaded ${successful.length} file(s)`, {
+          id: uploadToast,
+        });
+      } else if (successful.length > 0) {
+        toast.warning(
+          `Uploaded ${successful.length} of ${pending.length} files. ${failed.length} failed. Click retry on failed files.`,
+          { id: uploadToast, duration: 5000 },
+        );
+      } else {
+        toast.error(
+          `All ${pending.length} uploads failed. Please check your connection and try again.`,
+          {
+            id: uploadToast,
+            duration: 5000,
+          },
+        );
+      }
+
+      return finalFiles;
+    } catch (error: any) {
+      console.error("Upload batch error:", error);
+      toast.error("Upload system error. Please try again.", {
+        id: uploadToast,
+      });
+      return null;
+    } finally {
+      setIsUploading(false);
+      isUploadingRef.current = false;
+    }
+  }, [files, uploadWithRetry]);
+
+  const retryFailedUpload = useCallback(
+    async (fileId: string) => {
+      const fileToRetry = files.find((f) => f.id === fileId);
+      if (!fileToRetry || fileToRetry.isUploaded) return;
+
+      // Clear error and reset progress
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId
+            ? { ...f, uploadError: undefined, uploadProgress: 0, retryCount: 0 }
+            : f,
+        ),
+      );
+
+      try {
+        const result = await uploadWithRetry({
+          ...fileToRetry,
+          retryCount: 0,
+        });
+
+        setFiles((prev) => prev.map((f) => (f.id === fileId ? result : f)));
+
+        toast.success(`Successfully uploaded ${fileToRetry.name}`);
+      } catch (error: any) {
+        toast.error(`Failed to upload ${fileToRetry.name}: ${error.message}`);
+      }
+    },
+    [files, uploadWithRetry],
+  );
 
   const handleCameraCapture = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -396,7 +773,6 @@ const EditPostForm = () => {
         }
       });
 
-      // Handle rejections as before
       if (rejected.length > 0) {
         rejected.forEach(({ file, errors }) => {
           errors.forEach((err) => {
@@ -415,28 +791,25 @@ const EditPostForm = () => {
         return;
       }
 
-      // Use FileReader for camera files instead of createObjectURL
+      // Use createObjectURL for camera files (modern browsers handle this well)
       accepted.forEach((file) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const preview = reader.result as string; // base64 data URL — reliable on all mobile browsers
+        const preview = URL.createObjectURL(file);
 
-          setFiles((prev) => [
-            ...prev,
-            {
-              id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
-              name: file.name,
-              file,
-              preview, // ← data URL instead of blob URL
-              description: "",
-              uploadProgress: 0,
-              isUploaded: false,
-              isCover: prev.length === 0 && detectFileType(file) === "image",
-              fileType: detectFileType(file),
-            },
-          ]);
-        };
-        reader.readAsDataURL(file);
+        setFiles((prev) => [
+          ...prev,
+          {
+            id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+            name: file.name,
+            file,
+            preview,
+            description: "",
+            uploadProgress: 0,
+            isUploaded: false,
+            isCover: prev.length === 0 && detectFileType(file) === "image",
+            fileType: detectFileType(file),
+            retryCount: 0,
+          },
+        ]);
       });
 
       toast.success(`${accepted.length} file(s) added`);
@@ -449,8 +822,16 @@ const EditPostForm = () => {
     setFiles((prev) => {
       const next = [...prev];
       const removed = next.splice(index, 1)[0];
+
+      // Abort upload if in progress
+      if (!removed.isUploaded && abortControllersRef.current.has(removed.id)) {
+        abortControllersRef.current.get(removed.id)?.abort();
+        abortControllersRef.current.delete(removed.id);
+      }
+
       if (!removed.isUploaded && removed.preview.startsWith("blob:"))
         URL.revokeObjectURL(removed.preview);
+
       if (removed.isCover) {
         const fi = next.findIndex((f) => f.fileType === "image");
         if (fi !== -1) {
@@ -511,82 +892,6 @@ const EditPostForm = () => {
     });
   }, []);
 
-  /* ── upload ── */
-  const uploadFiles = useCallback(async (): Promise<boolean> => {
-    const pending = files.filter((f) => !f.isUploaded);
-    if (!pending.length) return true;
-    setIsUploading(true);
-    try {
-      const results = await Promise.allSettled(
-        pending.map(async (fd) => {
-          const r = await generatePresignedUrlAction({
-            fileName: fd.file!.name,
-            fileType: fd.file!.type,
-          });
-          if (!r.success || !r.data)
-            throw new Error(r.message || "No upload URL");
-          const { uploadUrl, key, fileUrl } = r.data;
-          await new Promise<void>((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open("PUT", uploadUrl, true);
-            xhr.setRequestHeader("Content-Type", fd.file!.type);
-            xhr.upload.onprogress = (e) => {
-              if (e.lengthComputable)
-                setFiles((prev) =>
-                  prev.map((f) =>
-                    f.id === fd.id
-                      ? {
-                          ...f,
-                          uploadProgress: Math.round(
-                            (e.loaded / e.total) * 100,
-                          ),
-                        }
-                      : f,
-                  ),
-                );
-            };
-            xhr.onload = () => {
-              if (xhr.status === 200) {
-                setFiles((prev) =>
-                  prev.map((f) =>
-                    f.id === fd.id
-                      ? {
-                          ...f,
-                          isUploaded: true,
-                          s3Key: key,
-                          s3Url: fileUrl,
-                          uploadProgress: 100,
-                        }
-                      : f,
-                  ),
-                );
-                resolve();
-              } else reject(new Error("Upload failed"));
-            };
-            xhr.onerror = () => reject(new Error("Upload failed"));
-            xhr.send(fd.file!);
-          });
-          return { success: true };
-        }),
-      );
-      const failures = results.filter(
-        (r) =>
-          r.status === "rejected" ||
-          (r.status === "fulfilled" && !r.value.success),
-      );
-      if (failures.length) {
-        toast.error(`${failures.length} file(s) failed to upload`);
-        return false;
-      }
-      return true;
-    } catch {
-      toast.error("Upload failed");
-      return false;
-    } finally {
-      setIsUploading(false);
-    }
-  }, [files]);
-
   /* ── submit ── */
   const handleSubmit = useCallback(async () => {
     if (!formData.title.trim()) {
@@ -602,54 +907,138 @@ const EditPostForm = () => {
       return;
     }
 
-    const pending = files.filter((f) => !f.isUploaded);
+    // Check for files with upload errors
+    const failedUploads = files.filter((f) => f.uploadError && !f.isUploaded);
+    if (failedUploads.length > 0) {
+      toast.error(
+        `${failedUploads.length} file(s) failed to upload. Please retry them before saving.`,
+      );
+      return;
+    }
+
+    let currentFilesForSubmit = files;
+    const pending = files.filter((f) => !f.isUploaded && f.file !== null);
+
     if (pending.length) {
       const confirmed = await confirmUpload(pending.length);
       if (!confirmed) return;
-      if (!(await uploadFiles())) {
-        toast.error("Some uploads failed");
+
+      const uploadedFiles = await uploadFiles();
+      if (!uploadedFiles) {
+        toast.error(
+          "Some uploads failed. Please retry failed files before saving.",
+        );
         return;
       }
+
+      // Check again for any failed uploads after batch upload
+      const stillFailed = uploadedFiles.filter((f) => f.uploadError);
+      if (stillFailed.length > 0) {
+        toast.error(
+          `${stillFailed.length} file(s) still failed. Please retry them individually.`,
+        );
+        return;
+      }
+
+      currentFilesForSubmit = uploadedFiles;
     }
 
-    const imgs = files.filter((f) => f.fileType === "image");
-    if (imgs.length && !files.some((f) => f.isCover)) {
-      const fi = files.findIndex((f) => f.fileType === "image");
-      setFiles((prev) => prev.map((f, i) => ({ ...f, isCover: i === fi })));
-      toast.info("Auto-set first image as cover");
+    // Handle cover image validation
+    const images = currentFilesForSubmit.filter((f) => f.fileType === "image");
+    if (images.length && !currentFilesForSubmit.some((f) => f.isCover)) {
+      const autoSet = window.confirm(
+        "No cover image selected. Would you like to automatically set the first image as cover?",
+      );
+
+      if (!autoSet) {
+        toast.error("Please select a cover image before submitting");
+        return;
+      }
+
+      const firstImageIndex = currentFilesForSubmit.findIndex(
+        (f) => f.fileType === "image",
+      );
+      if (firstImageIndex !== -1) {
+        currentFilesForSubmit = currentFilesForSubmit.map((f, i) => ({
+          ...f,
+          isCover: i === firstImageIndex,
+        }));
+        setFiles(currentFilesForSubmit);
+        toast.info("Auto-set first image as cover");
+      }
     }
 
     setIsSubmitting(true);
     try {
+      // Final validation: Ensure all files marked as uploaded have S3 URLs
+      const invalidFiles = currentFilesForSubmit.filter(
+        (f) => f.isUploaded && !f.s3Url && !f.existingImageId,
+      );
+
+      if (invalidFiles.length > 0) {
+        toast.error(
+          `${invalidFiles.length} file(s) are missing upload data. Please remove and re-upload them.`,
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
       const result = await updatePost({
         id: postId,
         title: formData.title,
         description: formData.description,
         category: formData.category,
         tags: formData.tags,
-        visibility: formData.isDraft ? "PRIVATE" : formData.visibility, // draft always private
+        visibility: formData.isDraft ? "PRIVATE" : formData.visibility,
         isDraft: formData.isDraft,
-        images: files.map((f) => ({
-          url: f.isUploaded ? f.s3Url || f.preview : f.preview,
+        images: currentFilesForSubmit.map((f) => ({
+          url: f.s3Url || f.preview,
           description: f.description,
           isCover: f.isCover,
           existingImageId: f.existingImageId,
         })),
       });
-      if (result.success) {
+
+      if (result.success && result.data) {
         setIsSubmitting(false);
         setIsRedirecting(true);
         toast.success(formData.isDraft ? "Saved as draft" : "Post saved!");
-        files.forEach((f) => {
+
+        // Cleanup old blob URLs
+        currentFilesForSubmit.forEach((f) => {
           if (f.preview.startsWith("blob:")) URL.revokeObjectURL(f.preview);
         });
+
+        // Update local state with fresh signed URLs
+        const updatedPost = result.data;
+        if (updatedPost.images) {
+          setFiles(
+            updatedPost.images.map((img) => {
+              const isVideo = isVideoUrl(img.url);
+              return {
+                id: img.id,
+                name: img.url.split("/").pop() || "image",
+                file: null,
+                preview: img.url,
+                description: img.description || "",
+                uploadProgress: 100,
+                isUploaded: true,
+                s3Url: img.url,
+                isCover: img.isCover || false,
+                fileType: isVideo ? "video" : "image",
+                existingImageId: img.id,
+                retryCount: 0,
+              };
+            }),
+          );
+        }
+
         setTimeout(() => router.push(`/posts/${postId}`), 200);
       } else {
-        setIsSubmitting(false);
-        setIsRedirecting(false);
         toast.error(result.message || "Failed to save");
       }
     } catch (e: any) {
+      console.error("Submit Error:", e);
       toast.error(e.message || "Failed to save");
     } finally {
       setIsSubmitting(false);
@@ -901,140 +1290,141 @@ const EditPostForm = () => {
                     </div>
 
                     {/* Tags */}
-              <div className="p-6 sm:p-8 space-y-4 bg-gray-50/60">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Tag size={14} className="text-gray-400" />
-                    <span className="text-sm font-semibold text-gray-900">
-                      Tags
-                    </span>
-                    {formData.tags.length > 0 && (
-                      <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
-                        {formData.tags.length} selected
-                      </span>
-                    )}
-                  </div>
-                  {formData.tags.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setFormData((prev) => ({ ...prev, tags: [] }))
-                      }
-                      className="text-xs font-medium text-gray-400 hover:text-red-500 transition-colors"
-                    >
-                      Clear all
-                    </button>
-                  )}
-                </div>
+                    <div className="p-6 sm:p-8 space-y-4 bg-gray-50/60">
+                      {/* Header */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Tag size={14} className="text-gray-400" />
+                          <span className="text-sm font-semibold text-gray-900">
+                            Tags
+                          </span>
+                          {formData.tags.length > 0 && (
+                            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                              {formData.tags.length} selected
+                            </span>
+                          )}
+                        </div>
+                        {formData.tags.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setFormData((prev) => ({ ...prev, tags: [] }))
+                            }
+                            className="text-xs font-medium text-gray-400 hover:text-red-500 transition-colors"
+                          >
+                            Clear all
+                          </button>
+                        )}
+                      </div>
 
-                {/* Search input */}
-                <div className="relative">
-                  <Search
-                    size={14}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                  />
-                  <input
-                    type="text"
-                    value={tagSearch}
-                    onChange={(e) => setTagSearch(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && tagSearch.trim()) {
-                        e.preventDefault();
-                        toggleTag(tagSearch.trim());
-                        setTagSearch("");
-                      }
-                    }}
-                    placeholder="Search or create a tag…"
-                    className="w-full pl-9 pr-9 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 focus:bg-white transition-all"
-                  />
-                  {isCheckingTag && (
-                    <Loader2
-                      size={13}
-                      className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-400 animate-spin"
-                    />
-                  )}
-                  {tagSearch && !isCheckingTag && (
-                    <button
-                      type="button"
-                      onClick={() => setTagSearch("")}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
-
-                {/* Search results */}
-                {tagSearch.trim() && (
-                  <div className="flex flex-wrap gap-2">
-                    {/* Existing tag found in DB */}
-                    {isTagInDb &&
-                      !isCheckingTag &&
-                      !formData.tags.some(
-                        (t) =>
-                          t.toLowerCase() === tagSearch.trim().toLowerCase(),
-                      ) && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            toggleTag(tagSearch.trim());
-                            setTagSearch("");
+                      {/* Search input */}
+                      <div className="relative">
+                        <Search
+                          size={14}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                        />
+                        <input
+                          type="text"
+                          value={tagSearch}
+                          onChange={(e) => setTagSearch(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && tagSearch.trim()) {
+                              e.preventDefault();
+                              toggleTag(tagSearch.trim());
+                              setTagSearch("");
+                            }
                           }}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-gray-600 border border-gray-200 hover:border-indigo-200 hover:text-indigo-600 hover:bg-indigo-50 text-xs font-medium transition-all"
-                        >
-                          <Hash size={10} className="opacity-60" />
-                          {tagSearch.trim().charAt(0).toUpperCase() +
-                            tagSearch.trim().slice(1)}
-                        </button>
+                          placeholder="Search or create a tag…"
+                          className="w-full pl-9 pr-9 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 focus:bg-white transition-all"
+                        />
+                        {isCheckingTag && (
+                          <Loader2
+                            size={13}
+                            className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-400 animate-spin"
+                          />
+                        )}
+                        {tagSearch && !isCheckingTag && (
+                          <button
+                            type="button"
+                            onClick={() => setTagSearch("")}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Search results */}
+                      {tagSearch.trim() && (
+                        <div className="flex flex-wrap gap-2">
+                          {/* Existing tag found in DB */}
+                          {isTagInDb &&
+                            !isCheckingTag &&
+                            !formData.tags.some(
+                              (t) =>
+                                t.toLowerCase() ===
+                                tagSearch.trim().toLowerCase(),
+                            ) && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  toggleTag(tagSearch.trim());
+                                  setTagSearch("");
+                                }}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-gray-600 border border-gray-200 hover:border-indigo-200 hover:text-indigo-600 hover:bg-indigo-50 text-xs font-medium transition-all"
+                              >
+                                <Hash size={10} className="opacity-60" />
+                                {tagSearch.trim().charAt(0).toUpperCase() +
+                                  tagSearch.trim().slice(1)}
+                              </button>
+                            )}
+
+                          {/* Create new tag — only when not in DB */}
+                          {canCreateTag && !isCheckingTag && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                toggleTag(tagSearch.trim());
+                                setTagSearch("");
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dashed border-indigo-300 text-indigo-600 hover:bg-indigo-50 text-xs font-medium transition-all"
+                            >
+                              <Sparkles size={11} />
+                              Create &quot;{tagSearch.trim()}&quot;
+                            </button>
+                          )}
+
+                          {/* Still checking */}
+                          {isCheckingTag && (
+                            <span className="text-xs text-gray-400 py-1.5">
+                              Searching…
+                            </span>
+                          )}
+                        </div>
                       )}
 
-                    {/* Create new tag — only when not in DB */}
-                    {canCreateTag && !isCheckingTag && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          toggleTag(tagSearch.trim());
-                          setTagSearch("");
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dashed border-indigo-300 text-indigo-600 hover:bg-indigo-50 text-xs font-medium transition-all"
-                      >
-                        <Sparkles size={11} />
-                        Create &quot;{tagSearch.trim()}&quot;
-                      </button>
-                    )}
-
-                    {/* Still checking */}
-                    {isCheckingTag && (
-                      <span className="text-xs text-gray-400 py-1.5">
-                        Searching…
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {/* Selected tags — always visible below search */}
-                {formData.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
-                    {formData.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-xl text-xs font-medium"
-                      >
-                        <Hash size={10} />
-                        {tag}
-                        <button
-                          type="button"
-                          onClick={() => toggleTag(tag)}
-                          className="ml-0.5 text-indigo-400 hover:text-indigo-700 transition-colors"
-                        >
-                          <X size={11} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
+                      {/* Selected tags — always visible below search */}
+                      {formData.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
+                          {formData.tags.map((tag) => (
+                            <span
+                              key={tag}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-xl text-xs font-medium"
+                            >
+                              <Hash size={10} />
+                              {tag}
+                              <button
+                                type="button"
+                                onClick={() => toggleTag(tag)}
+                                className="ml-0.5 text-indigo-400 hover:text-indigo-700 transition-colors"
+                              >
+                                <X size={11} />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -1243,7 +1633,7 @@ const EditPostForm = () => {
                             {files.filter((f) => f.isUploaded).length} uploaded
                           </span>
                         </div>
-                        {files.some((f) => !f.isUploaded) && (
+                        {files.some((f) => !f.isUploaded && !f.uploadError) && (
                           <Button
                             onClick={uploadFiles}
                             variant="primary"
@@ -1271,7 +1661,9 @@ const EditPostForm = () => {
           ${
             file.isCover
               ? "border-indigo-200 bg-gradient-to-br from-indigo-50/60 to-white shadow-sm shadow-indigo-100"
-              : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
+              : file.uploadError
+                ? "border-red-200 bg-red-50/30"
+                : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
           }`}
                           >
                             {/* Cover badge strip */}
@@ -1288,33 +1680,46 @@ const EditPostForm = () => {
                             )}
 
                             <div className="flex flex-col sm:flex-row items-start gap-3 p-4">
-                              {/* Thumbnail */}
+                              {/* Thumbnail - FIXED: Better video handling */}
                               <div
                                 onClick={() => {
+                                  const src =
+                                    file.preview && file.preview.trim() !== ""
+                                      ? file.preview
+                                      : null;
+                                  if (!src) return;
                                   setPreviewFile({
-                                    src: file.preview,
+                                    src,
                                     type: file.fileType as "image" | "video",
                                     name: file.name || "Uploaded file",
                                   });
                                   setPreviewError(false);
                                 }}
-                                className="relative w-full sm:w-[72px] h-48 sm:h-[72px] rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 shadow-sm cursor-zoom-in group"
+                                className={`relative w-full sm:w-[72px] h-48 sm:h-[72px] rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 shadow-sm group ${
+                                  file.preview && file.preview.trim() !== ""
+                                    ? "cursor-zoom-in"
+                                    : "cursor-default"
+                                }`}
                               >
                                 {file.fileType === "image" ? (
                                   <Image
-                                    src={file.preview}
-                                    alt={file.file?.name || "Image"}
+                                    src={safeSrc(file.preview)}
+                                    alt={file.name || "Image"}
                                     fill
                                     className="object-cover transition-transform duration-200 group-hover:scale-105"
                                     unoptimized
                                     sizes="(max-width: 640px) 100vw, 72px"
+                                    onError={(e) => {
+                                      const target =
+                                        e.target as HTMLImageElement;
+                                      target.src = DEFAULT_PREVIEW_IMAGE;
+                                    }}
                                   />
                                 ) : (
-                                  <video
+                                  // FIXED: Use VideoThumbnail component for better UX
+                                  <VideoThumbnail
                                     src={file.preview}
                                     className="absolute inset-0 w-full h-full object-cover"
-                                    muted
-                                    preload="metadata"
                                   />
                                 )}
                                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-200 flex items-center justify-center">
@@ -1334,6 +1739,11 @@ const EditPostForm = () => {
                                       <CheckCircle
                                         size={13}
                                         className="text-emerald-500 flex-shrink-0"
+                                      />
+                                    ) : file.uploadError ? (
+                                      <AlertCircle
+                                        size={13}
+                                        className="text-red-500 flex-shrink-0"
                                       />
                                     ) : (
                                       <AlertCircle
@@ -1362,6 +1772,18 @@ const EditPostForm = () => {
                                         {file.isCover ? "✓ Cover" : "Set Cover"}
                                       </button>
                                     )}
+                                    {file.uploadError && !file.isUploaded && (
+                                      <button
+                                        onClick={() =>
+                                          retryFailedUpload(file.id)
+                                        }
+                                        disabled={isSubmitting || isUploading}
+                                        className="p-1.5 text-amber-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                        title="Retry upload"
+                                      >
+                                        <RefreshCw size={16} />
+                                      </button>
+                                    )}
                                     <button
                                       onClick={() => removeFile(index)}
                                       disabled={isSubmitting}
@@ -1373,28 +1795,37 @@ const EditPostForm = () => {
                                 </div>
 
                                 {/* Upload progress */}
-                                {!file.isUploaded && isUploading && (
-                                  <div className="space-y-1">
-                                    <div className="flex justify-between text-[10px] font-medium text-gray-400">
-                                      <span className="flex items-center gap-1">
-                                        <Loader2
-                                          size={9}
-                                          className="animate-spin"
+                                {!file.isUploaded &&
+                                  !file.uploadError &&
+                                  isUploading && (
+                                    <div className="space-y-1">
+                                      <div className="flex justify-between text-[10px] font-medium text-gray-400">
+                                        <span className="flex items-center gap-1">
+                                          <Loader2
+                                            size={9}
+                                            className="animate-spin"
+                                          />
+                                          Uploading
+                                        </span>
+                                        <span className="tabular-nums text-indigo-500">
+                                          {file.uploadProgress}%
+                                        </span>
+                                      </div>
+                                      <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                                        <div
+                                          className="h-full bg-gradient-to-r from-indigo-500 to-indigo-400 rounded-full transition-all duration-300"
+                                          style={{
+                                            width: `${file.uploadProgress}%`,
+                                          }}
                                         />
-                                        Uploading
-                                      </span>
-                                      <span className="tabular-nums text-indigo-500">
-                                        {file.uploadProgress}%
-                                      </span>
+                                      </div>
                                     </div>
-                                    <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
-                                      <div
-                                        className="h-full bg-gradient-to-r from-indigo-500 to-indigo-400 rounded-full transition-all duration-300"
-                                        style={{
-                                          width: `${file.uploadProgress}%`,
-                                        }}
-                                      />
-                                    </div>
+                                  )}
+
+                                {/* Error message */}
+                                {file.uploadError && !file.isUploaded && (
+                                  <div className="text-xs text-red-600 bg-red-50 px-2 py-1.5 rounded-lg">
+                                    Error: {file.uploadError}
                                   </div>
                                 )}
 

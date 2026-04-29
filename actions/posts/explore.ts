@@ -1,9 +1,10 @@
+// actions/posts/explore.ts
 "use server";
 
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-providers";
-import { extractKeyFromUrl, generatePresignedViewUrl } from "@/lib/aws_s3";
+import { safeGetSignedUrl } from "@/lib/aws_s3";
 import type { Post } from "@/schemas/post";
 
 interface ExploreOptions {
@@ -14,51 +15,33 @@ interface ExploreOptions {
   tag?: string;
 }
 
-async function getSignedUrl(url: string | null | undefined) {
-  if (!url) return null;
-  const isExternal =
-    url.includes("googleusercontent.com") ||
-    (url.includes("http") && !url.includes("amazonaws.com"));
-  if (isExternal) return url;
-
-  try {
-    const key = extractKeyFromUrl(url);
-    return await generatePresignedViewUrl(key);
-  } catch {
-    return url;
-  }
-}
-
 export async function getExplorePosts(options: any = {}) {
   const session = await getServerSession(authOptions);
   try {
     const userId = session?.user?.id;
-
 
     const page = options.page || 1;
     const perPage = options.perPage || 10;
     const skip = (page - 1) * perPage;
     const search = options.search?.trim();
 
-    // 1. Visibility Filter (Database Level)
+    // Visibility Filter — only public posts, or followers-only posts if viewer follows the author
     const visibilityFilter = {
       OR: [
         { visibility: "PUBLIC" as any },
-        // exclude private posts from expore page 
-        // Only show followers-only posts if the viewer follows the author
         ...(userId
-          ? [{
-            AND: [
-              { visibility: "FOLLOWERS" as any },
+          ? [
               {
-                user: {
-                  followers: {
-                    some: { followerId: userId },
+                AND: [
+                  { visibility: "FOLLOWERS" as any },
+                  {
+                    user: {
+                      followers: { some: { followerId: userId } },
+                    },
                   },
-                },
+                ],
               },
-            ],
-          }]
+            ]
           : []),
       ],
     };
@@ -75,7 +58,6 @@ export async function getExplorePosts(options: any = {}) {
       ...(options.category && { category: options.category }),
     };
 
-    // 3. Execute Query
     const [posts, totalPosts] = await Promise.all([
       prisma.post.findMany({
         where: whereClause,
@@ -98,18 +80,17 @@ export async function getExplorePosts(options: any = {}) {
       prisma.post.count({ where: whereClause }),
     ]);
 
-    // 4. Transform with Avatar Signing & Null Checks
+    // Sign all URLs in parallel per post
+    // safeGetSignedUrl handles Google avatars, missing S3 files, malformed URLs
     const transformedPosts: Post[] = await Promise.all(
       posts.map(async (post) => {
-        // Safety check: If for some reason Prisma didn't return a user
         if (!post.user) {
           throw new Error(`Post ${post.id} is missing an author.`);
         }
 
-        // SIGN BOTH COVER AND AVATAR IN PARALLEL
         const [signedCoverImageUrl, signedUserAvatar] = await Promise.all([
-          getSignedUrl(post.images[0]?.url),
-          getSignedUrl(post.user.avatar),
+          safeGetSignedUrl(post.images[0]?.url ?? null),
+          safeGetSignedUrl(post.user.avatar),
         ]);
 
         return {
@@ -124,12 +105,12 @@ export async function getExplorePosts(options: any = {}) {
           user: {
             id: post.user.id,
             username: post.user.username,
-            avatar: signedUserAvatar, // FIXED: Signed URL
+            avatar: signedUserAvatar,
           },
           coverImage: signedCoverImageUrl,
           images: post.images.map((img) => ({
             id: img.id,
-            url: signedCoverImageUrl || img.url,
+            url: signedCoverImageUrl ?? img.url,
             description: null,
             isCover: img.isCover,
             createdAt: post.createdAt,
